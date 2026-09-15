@@ -26,7 +26,7 @@ interface RegisterFormProps {
 
 export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin }) => {
   const { register } = useAuth();
-  const { departments, locations } = useMasterData();
+  const { activeDepartments, activeLocations } = useMasterData();
 
   // 9 Required Registration Fields
   const [employeeName, setEmployeeName] = useState('');
@@ -113,8 +113,8 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
 
     setIsSubmitting(true);
 
-    const selectedDept = departments.find((d) => d.id === departmentId);
-    const selectedLoc = locations.find((l) => l.id === locationId);
+    const selectedDept = activeDepartments.find((d) => d.id === departmentId);
+    const selectedLoc = activeLocations.find((l) => l.id === locationId);
 
     const res = await register({
       employeeName: employeeName.trim(),
@@ -342,7 +342,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-100"
             >
               <option value="">Select Department...</option>
-              {departments.map((dept) => (
+              {activeDepartments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
@@ -404,7 +404,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchT
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-100"
             >
               <option value="">Select Location...</option>
-              {locations.map((loc) => (
+              {activeLocations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.code} - {loc.city}
                 </option>

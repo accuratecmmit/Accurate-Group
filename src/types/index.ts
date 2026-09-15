@@ -132,14 +132,24 @@ export const ROLE_DEFINITIONS: Record<UserRole, RolePermissions> = {
 // 2. Independent Master Data
 // ==========================================
 
+export interface MasterDataUsageCount {
+  tickets: number;
+  assets: number;
+  users: number;
+}
+
 export interface Company {
   id: string;
   code: string;
   name: string;
   domain?: string;
   contactEmail?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'ARCHIVED' | 'INACTIVE' | 'SUSPENDED';
   isDeleted: boolean; // Soft delete flag to preserve history
+  isArchived: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  usageCount?: MasterDataUsageCount;
   createdAt: string;
   updatedAt: string;
 }
@@ -154,8 +164,12 @@ export interface Location {
   country: string;
   postalCode?: string;
   timezone?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  status: 'ACTIVE' | 'ARCHIVED' | 'INACTIVE' | 'MAINTENANCE';
   isDeleted: boolean; // Soft delete flag to preserve history
+  isArchived: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  usageCount?: MasterDataUsageCount;
   createdAt: string;
   updatedAt: string;
 }
@@ -166,8 +180,12 @@ export interface Department {
   name: string;
   description?: string;
   headOfDepartmentId?: string; // FK -> UserProfile.id
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'ARCHIVED' | 'INACTIVE';
   isDeleted: boolean;
+  isArchived: boolean;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  usageCount?: MasterDataUsageCount;
   createdAt: string;
   updatedAt: string;
 }
@@ -194,6 +212,7 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   phoneNumber?: string;
+  mobileNumber?: string;
   role: UserRole;
   
   // Decoupled organizational relationships
@@ -287,18 +306,39 @@ export interface LoginResult {
 
 export interface UserProfileChangeRequest {
   id: string;
+  requestNumber: string; // e.g. 'PCR-10001'
   userId: string; // FK -> UserProfile.id
+  userEmail: string;
+  userName: string;
   requestedChanges: {
-    displayName?: string;
-    phoneNumber?: string;
+    employeeName?: string;
+    username?: string;
     departmentId?: string;
+    departmentName?: string;
+    designation?: string;
+    assetTag?: string;
     locationId?: string;
+    locationName?: string;
+    displayName?: string;
     jobTitle?: string;
   };
-  previousValues: Record<string, any>;
+  previousValues: {
+    employeeName?: string;
+    username?: string;
+    departmentId?: string;
+    departmentName?: string;
+    designation?: string;
+    assetTag?: string;
+    locationId?: string;
+    locationName?: string;
+    displayName?: string;
+    jobTitle?: string;
+    [key: string]: any;
+  };
   reason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
   reviewedBy?: string; // FK -> UserProfile.id (IT_ADMIN or SUPER_ADMIN)
+  reviewerName?: string;
   reviewedAt?: string;
   reviewNotes?: string;
   createdAt: string;
@@ -327,17 +367,51 @@ export type TicketCategory =
   | 'TELEPHONY'
   | 'OTHER';
 
-export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'URGENT';
 
 export type TicketStatus =
   | 'NEW'
+  | 'ASSIGNED'
   | 'OPEN'
   | 'IN_PROGRESS'
+  | 'WAITING_FOR_USER'
   | 'PENDING_VENDOR'
   | 'PENDING_USER'
   | 'RESOLVED'
   | 'CLOSED'
   | 'CANCELLED';
+
+export interface TicketAttachment {
+  id: string;
+  ticketId: string;
+  originalFileName: string;
+  storedFileName: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  extension: string;
+  isPreviewable: boolean;
+  uploadedById: string;
+  uploadedByName: string;
+  uploadedByRole: string;
+  uploadedAt: string;
+  isDeleted: boolean;
+  deletedAt?: string | null;
+  deletedById?: string | null;
+  deletedByName?: string | null;
+}
+
+export interface TicketHistoryItem {
+  id: string;
+  ticketId: string;
+  action: string;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  details: string;
+  fromValue?: string | null;
+  toValue?: string | null;
+  timestamp: string;
+}
 
 export interface Ticket {
   id: string;
@@ -351,16 +425,36 @@ export interface Ticket {
 
   // Requester context (fully decoupled)
   requesterId: string; // FK -> UserProfile.id
-  requesterCompanyId: string; // FK -> Company.id
-  requesterLocationId: string; // FK -> Location.id
+  requesterName?: string;
+  requesterEmail?: string;
+  requesterCompanyId?: string; // FK -> Company.id
+  requesterLocationId?: string; // FK -> Location.id
   requesterDepartmentId?: string; // FK -> Department.id
+
+  // Location & contact context
+  locationId?: string;
+  locationName?: string;
+  contactNumber?: string;
 
   // Assignment context
   assignedTeamId?: string | null; // FK -> ITTeam.id
+  assignedTeamName?: string | null;
   assignedTechnicianId?: string | null; // FK -> UserProfile.id (IT_TECHNICIAN or IT_ADMIN)
+  assignedTechnicianName?: string | null;
 
   // Associated hardware/computer (optional)
   relatedAssetId?: string | null; // FK -> Asset.id
+  relatedAssetTag?: string | null;
+  relatedAssetName?: string | null;
+  assetOverrideReason?: string | null; // Mandatory reason if employee created ticket for asset not assigned to them
+  historicalAssetAssignment?: {
+    assignedUserId?: string | null;
+    assignedUserName?: string | null;
+    assignedAtSnapshot?: string | null;
+  } | null;
+
+  // Attachments
+  attachmentIds?: string[];
 
   // SLA Tracking
   slaConfigId?: string | null; // FK -> SLAConfig.id
@@ -369,6 +463,8 @@ export interface Ticket {
   firstRespondedAt?: string | null;
   resolvedAt?: string | null;
   closedAt?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
 
   isDeleted: boolean; // Soft delete flag to preserve history
   createdAt: string;
@@ -452,6 +548,10 @@ export type AssetType =
   | 'TABLET';
 
 export type AssetStatus =
+  | 'Active'
+  | 'Inactive'
+  | 'Under Repair'
+  | 'Retired'
   | 'IN_STOCK'
   | 'ASSIGNED'
   | 'IN_REPAIR'
@@ -464,11 +564,41 @@ export interface AssetSpecifications {
   cpu?: string;
   ramGb?: number;
   storageGb?: number;
-  storageType?: 'SSD' | 'NVMe' | 'HDD';
+  storageType?: 'SSD' | 'NVMe' | 'HDD' | 'Flash' | string;
   os?: string;
   macAddress?: string;
   ipAddress?: string;
   screenSizeInches?: number;
+  [key: string]: any;
+}
+
+export interface AssetCustomField {
+  id: string;
+  fieldKey: string;
+  label: string;
+  fieldType: 'TEXT' | 'NUMBER' | 'DATE' | 'SELECT' | 'BOOLEAN';
+  options?: string[];
+  isRequired: boolean;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetAssignmentRecord {
+  id: string;
+  assetId: string;
+  previousEmployeeId?: string | null;
+  previousEmployeeName?: string | null;
+  currentEmployeeId?: string | null;
+  currentEmployeeName?: string | null;
+  assignmentDate: string;
+  transferDate?: string | null;
+  assignedByUserId: string;
+  assignedByUserName: string;
+  action: 'INITIAL_ASSIGNMENT' | 'TRANSFER' | 'RETURN_TO_STOCK' | 'STATUS_CHANGE' | 'IMPORT';
+  notes?: string;
+  createdAt: string;
 }
 
 export interface Asset {
@@ -487,16 +617,26 @@ export interface Asset {
   locationId: string; // FK -> Location.id
   departmentId?: string | null; // FK -> Department.id
 
-  // Allocation
+  // Allocation & Complete Assignment Tracking
   assignedUserId?: string | null; // FK -> UserProfile.id (or null if unallocated)
+  assignedUserName?: string | null;
+  assignedUserEmail?: string | null;
   assignedTeamId?: string | null; // FK -> ITTeam.id (for pool devices)
+  previousEmployeeId?: string | null;
+  previousEmployeeName?: string | null;
+  assignmentDate?: string | null;
+  transferDate?: string | null;
   status: AssetStatus;
 
   purchaseDate?: string;
   purchaseCost?: number;
   warrantyExpiryDate?: string;
+  notes?: string;
 
-  isDeleted: boolean; // Soft delete flag to preserve history
+  customFields?: Record<string, any>;
+  assignmentHistory?: AssetAssignmentRecord[];
+
+  isDeleted: boolean; // Soft delete flag to preserve history (never permanently deleted)
   createdAt: string;
   updatedAt: string;
 }

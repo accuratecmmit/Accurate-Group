@@ -39,7 +39,9 @@ import {
   User,
   History,
   ShieldCheck,
+  FileText,
 } from 'lucide-react';
+import { ProfileChangeRequestsTab } from './ProfileChangeRequestsTab';
 
 export const UserManagementView: React.FC = () => {
   const { effectiveRole, isSuperAdmin } = useAuth();
@@ -52,7 +54,7 @@ export const UserManagementView: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Active sub-tab
-  const [activeTab, setActiveTab] = useState<'PENDING' | 'USERS' | 'SESSIONS' | 'AUDIT'>('PENDING');
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'USERS' | 'PROFILE_REQUESTS' | 'SESSIONS' | 'AUDIT'>('PENDING');
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -313,6 +315,18 @@ export const UserManagementView: React.FC = () => {
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 text-[10px]">
             {activeSessions.length} live
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('PROFILE_REQUESTS')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'PROFILE_REQUESTS'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Profile Change Requests</span>
         </button>
 
         <button
@@ -791,6 +805,13 @@ export const UserManagementView: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ========================================== */}
+      {/* TAB: OFFICIAL PROFILE CHANGE REQUESTS */}
+      {/* ========================================== */}
+      {activeTab === 'PROFILE_REQUESTS' && (
+        <ProfileChangeRequestsTab />
       )}
 
       {/* ========================================== */}

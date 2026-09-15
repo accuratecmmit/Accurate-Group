@@ -14,6 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useMasterData } from '../../context/MasterDataContext';
 import { Button } from '../ui/Button';
 import { UserRole } from '../../types';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 export const Header: React.FC = () => {
   const {
@@ -165,6 +166,9 @@ export const Header: React.FC = () => {
                   >
                     {simulatedRole ? `[Simulated] ${permissions.label}` : permissions.label}
                   </span>
+
+                  {/* Notifications */}
+                  <NotificationBell />
 
                   {/* Active Sessions Control Button */}
                   <Button

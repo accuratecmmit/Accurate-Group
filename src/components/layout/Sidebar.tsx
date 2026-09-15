@@ -8,11 +8,26 @@ import {
   ShieldCheck,
   Building,
   Users,
+  Shield,
+  BarChart3,
+  User,
+  Home,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useMasterData } from '../../context/MasterDataContext';
 
-export type NavSection = 'overview' | 'schema' | 'master_data' | 'audit_logs' | 'inventory' | 'tickets' | 'users';
+export type NavSection =
+  | 'overview'
+  | 'employee_dashboard'
+  | 'employee_profile'
+  | 'tickets'
+  | 'inventory'
+  | 'it_teams'
+  | 'reports'
+  | 'users'
+  | 'master_data'
+  | 'schema'
+  | 'audit_logs';
 
 interface SidebarProps {
   activeSection: NavSection;
@@ -23,55 +38,87 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSelectSection
   const { effectiveRole, permissions, isSuperAdmin } = useAuth();
   const { companies, locations } = useMasterData();
 
+  const isITAdmin = effectiveRole === 'IT_ADMIN';
+  const isTechnician = effectiveRole === 'IT_TECHNICIAN';
+  const isEmployee = effectiveRole === 'EMPLOYEE';
+
   const navItems = [
     {
-      id: 'overview' as NavSection,
-      label: 'System Architecture',
+      id: 'employee_dashboard' as NavSection,
+      label: 'Employee Dashboard',
       icon: LayoutDashboard,
-      badge: 'Active',
+      badge: 'My Workspace',
+      visible: isEmployee,
+    },
+    {
+      id: 'employee_profile' as NavSection,
+      label: 'My Profile & Details',
+      icon: User,
+      badge: 'Official',
       visible: true,
+    },
+    {
+      id: 'tickets' as NavSection,
+      label: isEmployee ? 'My Support Tickets' : 'IT Helpdesk Tickets',
+      icon: Ticket,
+      badge: isEmployee ? 'My Tickets' : 'Team Queue',
+      visible: true,
+    },
+    {
+      id: 'inventory' as NavSection,
+      label: isEmployee ? 'My IT Assets' : 'Hardware Inventory',
+      icon: Laptop,
+      badge: isEmployee ? 'Assigned' : 'Hardware Pool',
+      visible: true,
+    },
+    {
+      id: 'it_teams' as NavSection,
+      label: 'IT Teams & Scoping',
+      icon: Shield,
+      badge: isSuperAdmin ? 'Full Admin' : 'Team Scope',
+      visible: isITAdmin || isSuperAdmin,
+    },
+    {
+      id: 'reports' as NavSection,
+      label: 'Operational Reports',
+      icon: BarChart3,
+      badge: 'Analytics',
+      visible: isITAdmin || isSuperAdmin,
     },
     {
       id: 'users' as NavSection,
-      label: 'User Management & Approvals',
+      label: 'User Accounts & Access',
       icon: Users,
-      badge: '9 Fields & Policy',
-      visible: permissions.canManageUsers || effectiveRole === 'IT_ADMIN' || effectiveRole === 'SUPER_ADMIN',
-    },
-    {
-      id: 'schema' as NavSection,
-      label: 'Database Schema & 3NF',
-      icon: Building,
-      badge: '25 Models',
-      visible: true,
+      badge: isSuperAdmin ? 'All Users' : 'Team Scope',
+      visible: isITAdmin || isSuperAdmin,
     },
     {
       id: 'master_data' as NavSection,
       label: 'Companies & Locations',
       icon: Building2,
       badge: `${companies.length} Co / ${locations.length} Loc`,
-      visible: permissions.canManageCompanies || permissions.canManageLocations || effectiveRole === 'IT_ADMIN',
+      visible: permissions.canManageCompanies || permissions.canManageLocations || isITAdmin || isSuperAdmin,
+    },
+    {
+      id: 'overview' as NavSection,
+      label: 'System Architecture',
+      icon: Building,
+      badge: 'Architecture',
+      visible: !isEmployee,
+    },
+    {
+      id: 'schema' as NavSection,
+      label: 'Database Schema & 3NF',
+      icon: Building,
+      badge: '25 Models',
+      visible: isITAdmin || isSuperAdmin,
     },
     {
       id: 'audit_logs' as NavSection,
-      label: 'Security & Audit Logs',
+      label: 'Security Audit Logs',
       icon: ScrollText,
       badge: 'Append-Only',
-      visible: permissions.canViewAuditLogs,
-    },
-    {
-      id: 'tickets' as NavSection,
-      label: 'IT Support Tickets',
-      icon: Ticket,
-      badge: 'Foundation',
-      visible: true,
-    },
-    {
-      id: 'inventory' as NavSection,
-      label: 'Computer Inventory',
-      icon: Laptop,
-      badge: 'Foundation',
-      visible: permissions.canManageInventory || permissions.canSubmitTickets,
+      visible: permissions.canViewAuditLogs || isSuperAdmin,
     },
   ];
 

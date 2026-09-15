@@ -34,6 +34,64 @@ import { handleFirestoreError } from '../lib/errors';
 import { logAuditEvent } from './auditService';
 import { logger } from '../lib/logger';
 
+import { getStoredToken } from './authService';
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getStoredToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+/**
+ * REST API Client for Server Master Data API
+ */
+export async function fetchMasterCompanies(includeArchived = false): Promise<{ companies: Company[]; error?: string }> {
+  try {
+    const res = await fetch(`/api/master/companies?includeArchived=${includeArchived}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { companies: [], error: data.error || 'Failed to fetch companies' };
+    }
+    return { companies: data.companies || [] };
+  } catch (err: any) {
+    return { companies: [], error: err.message || 'Network error fetching companies' };
+  }
+}
+
+export async function fetchMasterLocations(includeArchived = false): Promise<{ locations: Location[]; error?: string }> {
+  try {
+    const res = await fetch(`/api/master/locations?includeArchived=${includeArchived}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { locations: [], error: data.error || 'Failed to fetch locations' };
+    }
+    return { locations: data.locations || [] };
+  } catch (err: any) {
+    return { locations: [], error: err.message || 'Network error fetching locations' };
+  }
+}
+
+export async function fetchMasterDepartments(includeArchived = false): Promise<{ departments: Department[]; error?: string }> {
+  try {
+    const res = await fetch(`/api/master/departments?includeArchived=${includeArchived}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { departments: [], error: data.error || 'Failed to fetch departments' };
+    }
+    return { departments: data.departments || [] };
+  } catch (err: any) {
+    return { departments: [], error: err.message || 'Network error fetching departments' };
+  }
+}
+
 /**
  * Initializes the database configuration if not yet initialized.
  * Seeds initial 3 companies, 6 locations, departments, IT teams, SLAs, roles,
@@ -200,7 +258,7 @@ export async function initializeMasterDataIfEmpty(): Promise<{
 }
 
 // ========================
-// COMPANIES CRUD
+// COMPANIES CRUD & LIFECYCLE
 // ========================
 
 export function subscribeToCompanies(
@@ -229,89 +287,119 @@ export async function createCompany(
   companyData: Omit<Company, 'id' | 'createdAt' | 'updatedAt' | 'isDeleted'>,
   actorRole: string
 ): Promise<Company> {
-  const path = 'companies';
-  const id = `comp_${companyData.code.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now().toString(36)}`;
-  const now = new Date().toISOString();
-
-  const newCompany: Company = {
-    ...companyData,
-    id,
-    isDeleted: false,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  try {
-    await setDoc(doc(db, path, id), newCompany);
-    await logAuditEvent({
-      action: 'COMPANY_CREATED',
-      entityType: 'COMPANY',
-      entityId: id,
-      companyId: id,
-      actorRole,
-      details: { code: newCompany.code, name: newCompany.name },
-    });
-    return newCompany;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${path}/${id}`);
+  // Call server API for centralized state, uniqueness validation, and server audit logging
+  const res = await fetch('/api/master/companies', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(companyData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create company');
   }
+
+  const created: Company = data.company;
+
+  // Sync to Firestore for real-time subscribers if connected
+  try {
+    await setDoc(doc(db, 'companies', created.id), created);
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for createCompany:', err);
+  }
+
+  return created;
 }
 
 export async function updateCompany(
   id: string,
   updates: Partial<Omit<Company, 'id' | 'createdAt'>>,
   actorRole: string
-): Promise<void> {
-  const path = 'companies';
-  const now = new Date().toISOString();
+): Promise<Company> {
+  const res = await fetch(`/api/master/companies/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(updates),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update company');
+  }
+
+  const updated: Company = data.company;
 
   try {
-    const docRef = doc(db, path, id);
-    await updateDoc(docRef, {
+    await updateDoc(doc(db, 'companies', id), {
       ...updates,
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     });
-
-    await logAuditEvent({
-      action: 'COMPANY_UPDATED',
-      entityType: 'COMPANY',
-      entityId: id,
-      companyId: id,
-      actorRole,
-      details: updates,
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${path}/${id}`);
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for updateCompany:', err);
   }
+
+  return updated;
 }
 
 /**
- * Soft delete: preserve historical records. Never physically drops the row.
+ * Disable/Archive: never physically deletes records to preserve historical integrity.
  */
-export async function deleteCompany(id: string, code: string, actorRole: string): Promise<void> {
-  const path = 'companies';
-  const now = new Date().toISOString();
-  try {
-    await updateDoc(doc(db, path, id), {
-      isDeleted: true,
-      status: 'INACTIVE',
-      updatedAt: now,
-    });
-    await logAuditEvent({
-      action: 'COMPANY_DELETED_SOFT',
-      entityType: 'COMPANY',
-      entityId: id,
-      companyId: id,
-      actorRole,
-      details: { code, note: 'Soft-deleted to preserve ticket & asset historical audit trails' },
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${path}/${id}`);
+export async function archiveCompany(id: string, code: string, actorRole: string): Promise<Company> {
+  const res = await fetch(`/api/master/companies/${id}/archive`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to archive company');
   }
+
+  try {
+    await updateDoc(doc(db, 'companies', id), {
+      isArchived: true,
+      status: 'ARCHIVED',
+      archivedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for archiveCompany:', err);
+  }
+
+  return data.company;
+}
+
+/**
+ * Re-create / Restore archived company.
+ */
+export async function restoreCompany(id: string, actorRole: string): Promise<Company> {
+  const res = await fetch(`/api/master/companies/${id}/restore`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to restore company');
+  }
+
+  try {
+    await updateDoc(doc(db, 'companies', id), {
+      isArchived: false,
+      status: 'ACTIVE',
+      archivedAt: null,
+      archivedBy: null,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for restoreCompany:', err);
+  }
+
+  return data.company;
+}
+
+export async function deleteCompany(id: string, code: string, actorRole: string): Promise<void> {
+  await archiveCompany(id, code, actorRole);
 }
 
 // ========================
-// LOCATIONS CRUD
+// LOCATIONS CRUD & LIFECYCLE (INDEPENDENT DATA ARCHITECTURE)
 // ========================
 
 export function subscribeToLocations(
@@ -340,89 +428,117 @@ export async function createLocation(
   locationData: Omit<Location, 'id' | 'createdAt' | 'updatedAt' | 'isDeleted'>,
   actorRole: string
 ): Promise<Location> {
-  const path = 'locations';
-  const id = `loc_${locationData.code.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now().toString(36)}`;
-  const now = new Date().toISOString();
+  const res = await fetch('/api/master/locations', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(locationData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create location');
+  }
 
-  const newLocation: Location = {
-    ...locationData,
-    id,
-    isDeleted: false,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const created: Location = data.location;
 
   try {
-    await setDoc(doc(db, path, id), newLocation);
-    await logAuditEvent({
-      action: 'LOCATION_CREATED',
-      entityType: 'LOCATION',
-      entityId: id,
-      locationId: id,
-      actorRole,
-      details: { code: newLocation.code, name: newLocation.name, city: newLocation.city },
-    });
-    return newLocation;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `${path}/${id}`);
+    await setDoc(doc(db, 'locations', created.id), created);
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for createLocation:', err);
   }
+
+  return created;
 }
 
 export async function updateLocation(
   id: string,
   updates: Partial<Omit<Location, 'id' | 'createdAt'>>,
   actorRole: string
-): Promise<void> {
-  const path = 'locations';
-  const now = new Date().toISOString();
+): Promise<Location> {
+  const res = await fetch(`/api/master/locations/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(updates),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update location');
+  }
+
+  const updated: Location = data.location;
 
   try {
-    const docRef = doc(db, path, id);
-    await updateDoc(docRef, {
+    await updateDoc(doc(db, 'locations', id), {
       ...updates,
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     });
-
-    await logAuditEvent({
-      action: 'LOCATION_UPDATED',
-      entityType: 'LOCATION',
-      entityId: id,
-      locationId: id,
-      actorRole,
-      details: updates,
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${path}/${id}`);
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for updateLocation:', err);
   }
+
+  return updated;
 }
 
 /**
- * Soft delete: preserve historical records.
+ * Disable/Archive: never physically deletes records to preserve historical integrity.
  */
-export async function deleteLocation(id: string, code: string, actorRole: string): Promise<void> {
-  const path = 'locations';
-  const now = new Date().toISOString();
-  try {
-    await updateDoc(doc(db, path, id), {
-      isDeleted: true,
-      status: 'INACTIVE',
-      updatedAt: now,
-    });
-    await logAuditEvent({
-      action: 'LOCATION_DELETED_SOFT',
-      entityType: 'LOCATION',
-      entityId: id,
-      locationId: id,
-      actorRole,
-      details: { code, note: 'Soft-deleted to preserve ticket & asset historical audit trails' },
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `${path}/${id}`);
+export async function archiveLocation(id: string, code: string, actorRole: string): Promise<Location> {
+  const res = await fetch(`/api/master/locations/${id}/archive`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to archive location');
   }
+
+  try {
+    await updateDoc(doc(db, 'locations', id), {
+      isArchived: true,
+      status: 'ARCHIVED',
+      archivedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for archiveLocation:', err);
+  }
+
+  return data.location;
+}
+
+/**
+ * Re-create / Restore archived location.
+ */
+export async function restoreLocation(id: string, actorRole: string): Promise<Location> {
+  const res = await fetch(`/api/master/locations/${id}/restore`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to restore location');
+  }
+
+  try {
+    await updateDoc(doc(db, 'locations', id), {
+      isArchived: false,
+      status: 'ACTIVE',
+      archivedAt: null,
+      archivedBy: null,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for restoreLocation:', err);
+  }
+
+  return data.location;
+}
+
+export async function deleteLocation(id: string, code: string, actorRole: string): Promise<void> {
+  await archiveLocation(id, code, actorRole);
 }
 
 // ========================
-// DEPARTMENTS CRUD
+// DEPARTMENTS CRUD & LIFECYCLE (SUPER ADMIN ALONE)
 // ========================
 
 export function subscribeToDepartments(
@@ -445,6 +561,120 @@ export function subscribeToDepartments(
       handleFirestoreError(error, OperationType.LIST, path);
     }
   );
+}
+
+export async function createDepartment(
+  departmentData: Omit<Department, 'id' | 'createdAt' | 'updatedAt' | 'isDeleted'>,
+  actorRole: string
+): Promise<Department> {
+  const res = await fetch('/api/master/departments', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(departmentData),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to create department');
+  }
+
+  const created: Department = data.department;
+
+  try {
+    await setDoc(doc(db, 'departments', created.id), created);
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for createDepartment:', err);
+  }
+
+  return created;
+}
+
+export async function updateDepartment(
+  id: string,
+  updates: Partial<Omit<Department, 'id' | 'createdAt'>>,
+  actorRole: string
+): Promise<Department> {
+  const res = await fetch(`/api/master/departments/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(updates),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update department');
+  }
+
+  const updated: Department = data.department;
+
+  try {
+    await updateDoc(doc(db, 'departments', id), {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for updateDepartment:', err);
+  }
+
+  return updated;
+}
+
+/**
+ * Super Admin alone can disable/archive department.
+ * Preserves historical references.
+ */
+export async function archiveDepartment(id: string, code: string, actorRole: string): Promise<Department> {
+  const res = await fetch(`/api/master/departments/${id}/archive`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to archive department');
+  }
+
+  try {
+    await updateDoc(doc(db, 'departments', id), {
+      isArchived: true,
+      status: 'ARCHIVED',
+      archivedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for archiveDepartment:', err);
+  }
+
+  return data.department;
+}
+
+/**
+ * Super Admin alone can restore/re-create department.
+ */
+export async function restoreDepartment(id: string, actorRole: string): Promise<Department> {
+  const res = await fetch(`/api/master/departments/${id}/restore`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to restore department');
+  }
+
+  try {
+    await updateDoc(doc(db, 'departments', id), {
+      isArchived: false,
+      status: 'ACTIVE',
+      archivedAt: null,
+      archivedBy: null,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for restoreDepartment:', err);
+  }
+
+  return data.department;
+}
+
+export async function deleteDepartment(id: string, code: string, actorRole: string): Promise<void> {
+  await archiveDepartment(id, code, actorRole);
 }
 
 // ========================
@@ -497,4 +727,32 @@ export function subscribeToSLAConfigs(
       handleFirestoreError(error, OperationType.LIST, path);
     }
   );
+}
+
+// ========================
+// AUDIT LOGS QUERY API
+// ========================
+
+export async function fetchServerAuditLogs(params?: {
+  entityType?: string;
+  search?: string;
+  limit?: number;
+}): Promise<{ auditLogs: any[]; error?: string }> {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.entityType) qs.set('entityType', params.entityType);
+    if (params?.search) qs.set('search', params.search);
+    if (params?.limit) qs.set('limit', String(params.limit));
+
+    const res = await fetch(`/api/audit-logs?${qs.toString()}`, {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { auditLogs: [], error: data.error || 'Failed to fetch audit logs' };
+    }
+    return { auditLogs: data.auditLogs || [] };
+  } catch (err: any) {
+    return { auditLogs: [], error: err.message || 'Network error fetching audit logs' };
+  }
 }
