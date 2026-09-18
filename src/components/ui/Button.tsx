@@ -7,6 +7,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   icon?: LucideIcon;
   iconPosition?: 'left' | 'right';
   isLoading?: boolean;
+  loading?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -16,10 +17,12 @@ export const Button: React.FC<ButtonProps> = ({
   icon: Icon,
   iconPosition = 'left',
   isLoading = false,
+  loading = false,
   className = '',
   disabled,
   ...props
 }) => {
+  const effectiveLoading = Boolean(isLoading || loading);
   const baseStyles =
     'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shadow-2xs';
 
@@ -45,10 +48,10 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={`${baseStyles} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
-      disabled={disabled || isLoading}
+      disabled={disabled || effectiveLoading}
       {...props}
     >
-      {isLoading ? (
+      {effectiveLoading ? (
         <svg
           className="animate-spin -ml-0.5 mr-2 h-4 w-4 text-current"
           xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +76,7 @@ export const Button: React.FC<ButtonProps> = ({
         Icon && iconPosition === 'left' && <Icon className="w-4 h-4 shrink-0" />
       )}
       <span>{children}</span>
-      {!isLoading && Icon && iconPosition === 'right' && (
+      {!effectiveLoading && Icon && iconPosition === 'right' && (
         <Icon className="w-4 h-4 shrink-0" />
       )}
     </button>

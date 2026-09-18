@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/Button';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
   Laptop,
   Smartphone,
@@ -25,16 +26,15 @@ export const SessionManagerModal: React.FC = () => {
   } = useAuth();
 
   const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+  const [showConfirmLogoutAll, setShowConfirmLogoutAll] = useState(false);
 
   if (!sessionManagerOpen) return null;
 
-  const handleLogoutAll = async () => {
-    if (!confirm('Are you sure you want to terminate all active sessions across all devices? You will be signed out.')) {
-      return;
-    }
+  const handleLogoutAllConfirm = async () => {
     setIsLoggingOutAll(true);
     await logoutAllDevices();
     setIsLoggingOutAll(false);
+    setShowConfirmLogoutAll(false);
   };
 
   return (
@@ -152,7 +152,7 @@ export const SessionManagerModal: React.FC = () => {
             <Button
               variant="danger"
               size="sm"
-              onClick={handleLogoutAll}
+              onClick={() => setShowConfirmLogoutAll(true)}
               isLoading={isLoggingOutAll}
               icon={LogOut}
               className="text-xs font-semibold"
@@ -162,6 +162,18 @@ export const SessionManagerModal: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showConfirmLogoutAll}
+        title="Terminate All Device Sessions"
+        message="Are you sure you want to terminate all active sessions across all devices? You will be signed out of this workstation and all other devices immediately."
+        confirmText="Log Out Everywhere"
+        cancelText="Keep Sessions"
+        variant="danger"
+        loading={isLoggingOutAll}
+        onConfirm={handleLogoutAllConfirm}
+        onCancel={() => setShowConfirmLogoutAll(false)}
+      />
     </div>
   );
 };

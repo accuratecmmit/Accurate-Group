@@ -12,6 +12,9 @@ import { ITTeamManagementView } from '../teams/ITTeamManagementView';
 import { ReportsView } from '../reports/ReportsView';
 import { EmployeeDashboardView } from '../employee/EmployeeDashboardView';
 import { EmployeeProfileView } from '../employee/EmployeeProfileView';
+import { SuperAdminDashboardView } from '../dashboard/SuperAdminDashboardView';
+import { ITAdminDashboardView } from '../dashboard/ITAdminDashboardView';
+import { TechnicianDashboardView } from '../dashboard/TechnicianDashboardView';
 import { AuthModal } from '../auth/AuthModal';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { SessionManagerModal } from '../auth/SessionManagerModal';
@@ -24,11 +27,13 @@ import { Badge } from '../ui/Badge';
 
 export const AppShell: React.FC = () => {
   const { user, profile, effectiveRole, isLoading, openAuthModal } = useAuth();
-  const [activeSection, setActiveSection] = useState<NavSection>('overview');
+  const [activeSection, setActiveSection] = useState<NavSection>('dashboard');
 
   useEffect(() => {
     if (effectiveRole === 'EMPLOYEE') {
       setActiveSection('employee_dashboard');
+    } else {
+      setActiveSection('dashboard');
     }
   }, [effectiveRole]);
 
@@ -79,8 +84,43 @@ export const AppShell: React.FC = () => {
         />
 
         <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+          {/* Executive / IT Admin / Technician Dashboard */}
+          {activeSection === 'dashboard' && (
+            <>
+              {effectiveRole === 'SUPER_ADMIN' && (
+                <SuperAdminDashboardView
+                  onNavigateToTickets={() => setActiveSection('tickets')}
+                  onNavigateToUsers={() => setActiveSection('users')}
+                  onNavigateToInventory={() => setActiveSection('inventory')}
+                  onNavigateToTeams={() => setActiveSection('it_teams')}
+                  onNavigateToReports={() => setActiveSection('reports')}
+                />
+              )}
+              {effectiveRole === 'IT_ADMIN' && (
+                <ITAdminDashboardView
+                  onNavigateToTickets={() => setActiveSection('tickets')}
+                  onNavigateToInventory={() => setActiveSection('inventory')}
+                  onNavigateToReports={() => setActiveSection('reports')}
+                />
+              )}
+              {effectiveRole === 'IT_TECHNICIAN' && (
+                <TechnicianDashboardView
+                  onNavigateToTickets={() => setActiveSection('tickets')}
+                  onNavigateToInventory={() => setActiveSection('inventory')}
+                />
+              )}
+              {effectiveRole === 'EMPLOYEE' && (
+                <EmployeeDashboardView
+                  onNavigateToProfile={() => setActiveSection('employee_profile')}
+                  onNavigateToTickets={() => setActiveSection('tickets')}
+                  onNavigateToInventory={() => setActiveSection('inventory')}
+                />
+              )}
+            </>
+          )}
+
           {/* Employee Dashboard */}
-          {(activeSection === 'employee_dashboard' || (effectiveRole === 'EMPLOYEE' && activeSection === 'overview')) && (
+          {activeSection === 'employee_dashboard' && (
             <EmployeeDashboardView
               onNavigateToProfile={() => setActiveSection('employee_profile')}
               onNavigateToTickets={() => setActiveSection('tickets')}

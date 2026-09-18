@@ -72,28 +72,28 @@ service cloud.firestore {
       allow get, list: if true;
       allow create: if isSuperAdmin() && isValidId(companyId);
       allow update: if isSuperAdmin();
-      allow delete: if false; // Preserve historical records (soft delete only)
+      allow delete: if isSuperAdmin();
     }
 
     match /locations/{locationId} {
       allow get, list: if true;
       allow create: if isSuperAdmin() && isValidId(locationId);
       allow update: if isSuperAdmin();
-      allow delete: if false; // Soft delete only
+      allow delete: if isSuperAdmin();
     }
 
     match /departments/{departmentId} {
       allow get, list: if true;
       allow create: if isSuperAdmin() && isValidId(departmentId);
       allow update: if isSuperAdmin();
-      allow delete: if false; // Soft delete only
+      allow delete: if isSuperAdmin();
     }
 
     match /it_teams/{teamId} {
       allow get, list: if true;
       allow create: if isSuperAdmin() && isValidId(teamId);
       allow update: if isSuperAdmin();
-      allow delete: if false; // Soft delete only
+      allow delete: if isSuperAdmin();
     }
 
     match /roles/{roleId} {
@@ -200,11 +200,19 @@ service cloud.firestore {
     // ==========================================
 
     match /assets/{assetId} {
-      allow get, list: if isSignedIn();
-      allow create: if isITAdmin();
-      allow update: if isITTechnician() &&
-        incoming().assetTag == existing().assetTag; // Asset tag is immutable
-      allow delete: if false; // Soft delete only
+      // Employee: view own assigned assets only.
+      // IT Technician / IT Admin / Super Admin: inventory access.
+      allow get: if isSignedIn() && (
+        isITTechnician() ||
+        resource.data.assignedUserId == request.auth.uid
+      );
+      allow list: if isSignedIn() && (
+        isITTechnician() ||
+        resource.data.assignedUserId == request.auth.uid
+      );
+      allow create: if isITTechnician();
+      allow update: if isITTechnician();
+      allow delete: if false; // Soft delete only (Never permanently delete assets)
 
       // Subcollection: Assignment History (Append-Only)
       match /assignment_history/{historyId} {

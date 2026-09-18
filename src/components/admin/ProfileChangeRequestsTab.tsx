@@ -57,7 +57,7 @@ export const ProfileChangeRequestsTab: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 
-  const filteredRequests = requests.filter((r) => {
+  const filteredRequests = (requests || []).filter((r) => {
     const matchesSearch =
       r.requestNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,7 +69,7 @@ export const ProfileChangeRequestsTab: React.FC = () => {
     return r.status === statusFilter;
   });
 
-  const pendingCount = requests.filter((r) => r.status === 'PENDING').length;
+  const pendingCount = (requests || []).filter((r) => r.status === 'PENDING').length;
 
   const handleOpenReviewModal = (req: UserProfileChangeRequest, action: 'APPROVE' | 'REJECT') => {
     setReviewingRequest(req);

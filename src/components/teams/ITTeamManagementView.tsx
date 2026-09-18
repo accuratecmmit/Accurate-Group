@@ -58,7 +58,7 @@ export const ITTeamManagementView: React.FC = () => {
       if (teamRes.error) {
         setErrorMsg(teamRes.error);
       } else {
-        setTeams(teamRes.teams);
+        setTeams(teamRes.teams || []);
       }
 
       setStaffUsers(userRes.users || []);
@@ -82,7 +82,7 @@ export const ITTeamManagementView: React.FC = () => {
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCode || !newName) {
-      alert('Team code and name are required.');
+      setErrorMsg('Team code and name are required.');
       return;
     }
 
@@ -227,8 +227,8 @@ export const ITTeamManagementView: React.FC = () => {
 
       {/* IT Teams Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {teams.map((team) => {
-          const members = staffUsers.filter((u) => u.itTeamId === team.id);
+        {(teams || []).map((team) => {
+          const members = (staffUsers || []).filter((u) => u.itTeamId === team.id);
           const isMyTeam = profile?.itTeamId === team.id;
 
           return (

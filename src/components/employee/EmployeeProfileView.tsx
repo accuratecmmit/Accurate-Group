@@ -768,7 +768,7 @@ export const EmployeeProfileView: React.FC = () => {
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
                   <option value="">-- Select Department --</option>
-                  {departments
+                  {(departments || [])
                     .filter((d) => !d.isArchived)
                     .map((d) => (
                       <option key={d.id} value={d.id}>
@@ -820,7 +820,7 @@ export const EmployeeProfileView: React.FC = () => {
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 >
                   <option value="">-- Select Work Location --</option>
-                  {locations
+                  {(locations || [])
                     .filter((l) => !l.isArchived)
                     .map((l) => (
                       <option key={l.id} value={l.id}>

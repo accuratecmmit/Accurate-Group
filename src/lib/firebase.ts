@@ -15,6 +15,29 @@ googleProvider.setCustomParameters({
 });
 
 /**
+ * Recursively removes any undefined keys from an object to satisfy Firestore's requirement
+ * that document payloads cannot contain undefined values.
+ */
+export function removeUndefinedFields<T extends Record<string, any>>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => removeUndefinedFields(item)) as unknown as T;
+  }
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] =
+        value !== null && typeof value === 'object' && !(value instanceof Date)
+          ? removeUndefinedFields(value)
+          : value;
+    }
+  }
+  return result as T;
+}
+
+/**
  * Validates connection to the provisioned Firestore database on startup.
  */
 export async function testFirestoreConnection(): Promise<{ connected: boolean; message?: string }> {

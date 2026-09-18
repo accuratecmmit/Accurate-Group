@@ -603,7 +603,7 @@ export interface AssetAssignmentRecord {
 
 export interface Asset {
   id: string;
-  // Non-reusable unique asset identifier (e.g. AST-00801)
+  // Non-reusable unique asset identifier (e.g. AST-00801 / Asset Number)
   assetTag: string;
   serialNumber: string;
   name: string;
@@ -614,24 +614,70 @@ export interface Asset {
 
   // Master Data Affiliations (strictly independent)
   companyId: string; // FK -> Company.id
+  companyName?: string;
+  company?: string | null;
   locationId: string; // FK -> Location.id
+  locationName?: string;
+  location?: string | null;
   departmentId?: string | null; // FK -> Department.id
+  departmentName?: string | null;
+  department?: string | null;
 
   // Allocation & Complete Assignment Tracking
   assignedUserId?: string | null; // FK -> UserProfile.id (or null if unallocated)
   assignedUserName?: string | null;
   assignedUserEmail?: string | null;
+  assignedEmployeeName?: string | null; // Exact mapping to Excel Assigned Employee Name
+  assetUserName?: string | null; // Exact mapping to Excel Asset User Name
   assignedTeamId?: string | null; // FK -> ITTeam.id (for pool devices)
   previousEmployeeId?: string | null;
   previousEmployeeName?: string | null;
   assignmentDate?: string | null;
   transferDate?: string | null;
-  status: AssetStatus;
 
+  // Status & Condition (strictly separated)
+  status: AssetStatus; // 'Active' | 'Inactive' | 'Under Repair' | 'Retired'
+  condition?: string; // 'Good' | 'Fair' | 'Damaged' | 'Working' | 'New (NH)' | 'Old (SH)' | string
+
+  // Hardware Specifications & Components
+  ipAddress?: string; // Excel column: 'IP Adresss'
+  processor?: string;
+  storage?: string;
+  ram?: string;
+  windowsVersion?: string;
+  msOffice?: string;
+  escan?: string;
+  motherboard?: string;
+  display?: string;
+  displaySize?: string;
+  lanCard?: string;
+  upsBattery?: string;
+  newOrOld?: string; // 'New (NH)' | 'Old (SH)'
+
+  // Financial & Procurement Details
   purchaseDate?: string;
-  purchaseCost?: number;
+  purchaseDateParsed?: string | null;
+  purchaseCost?: number | null; // Purchase Cost (INR)
+  vendor?: string;
+  invoiceNumber?: string;
+
+  // Lifecycle, Warranties & Services
+  warrantyStart?: string;
+  warrantyEnd?: string;
   warrantyExpiryDate?: string;
+  lastServiceDate?: string;
+  amcStart?: string;
+  amcEnd?: string;
+  remarks?: string;
   notes?: string;
+
+  // Automated Calculated Fields
+  assetAgeYears?: number | null; // Asset Age (Yrs)
+  expectedLifeYears?: number | null; // Expected Life (Yrs)
+  expectedReplacementDate?: string | null; // Expected Replacement Date
+  depreciatedValueINR?: number | null; // Depreciated Value (INR)
+  replacementAlert?: string | null; // Replacement Alert
+  warrantyAlert?: string | null; // Warranty Alert
 
   customFields?: Record<string, any>;
   assignmentHistory?: AssetAssignmentRecord[];

@@ -17,6 +17,7 @@ import {
   Laptop,
   Users,
   AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { useMasterData } from '../../context/MasterDataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +28,7 @@ import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 export const MasterDataManager: React.FC = () => {
   const {
@@ -39,14 +41,21 @@ export const MasterDataManager: React.FC = () => {
     editCompany,
     archiveCompany,
     restoreCompany,
+    removeCompany,
+    removeAllCompanies,
     addLocation,
     editLocation,
     archiveLocation,
     restoreLocation,
+    removeLocation,
+    removeAllLocations,
     addDepartment,
     editDepartment,
     archiveDepartment,
     restoreDepartment,
+    removeDepartment,
+    removeAllDepartments,
+    purgeDemoData,
   } = useMasterData();
 
   const { isSuperAdmin } = useAuth();
@@ -91,6 +100,22 @@ export const MasterDataManager: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  // Destructive Confirmation Dialog State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const displayMessage = (msg: string, isError = false) => {
     if (isError) {
       setActionError(msg);
@@ -105,9 +130,9 @@ export const MasterDataManager: React.FC = () => {
   // ---------------------------------------------
   // Filtered lists (Archived toggle)
   // ---------------------------------------------
-  const filteredCompanies = companies.filter((c) => (showArchived ? true : !c.isArchived && c.status === 'ACTIVE'));
-  const filteredLocations = locations.filter((l) => (showArchived ? true : !l.isArchived && l.status === 'ACTIVE'));
-  const filteredDepartments = departments.filter((d) => (showArchived ? true : !d.isArchived && d.status === 'ACTIVE'));
+  const filteredCompanies = (companies || []).filter((c) => (showArchived ? true : !c.isArchived && c.status === 'ACTIVE'));
+  const filteredLocations = (locations || []).filter((l) => (showArchived ? true : !l.isArchived && l.status === 'ACTIVE'));
+  const filteredDepartments = (departments || []).filter((d) => (showArchived ? true : !d.isArchived && d.status === 'ACTIVE'));
 
   // ---------------------------------------------
   // Company Handlers
@@ -163,32 +188,81 @@ export const MasterDataManager: React.FC = () => {
     }
   };
 
-  const handleArchiveCompany = async (company: Company) => {
+  const handleArchiveCompany = (company: Company) => {
     const usage = company.usageCount || { tickets: 0, assets: 0, users: 0 };
-    const confirmMsg =
-      `Archive company "${company.name}" (${company.code})?\n\n` +
-      `Historical integrity is guaranteed: ${usage.tickets} tickets, ${usage.assets} assets, and ${usage.users} users will retain their original company reference.\n\n` +
-      `This company will be disabled for new ticket and asset creation, but remains available to Super Admin.`;
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      await archiveCompany(company.id, company.code);
-      displayMessage(`Company "${company.name}" archived successfully. Historical references preserved.`);
-    } catch (err: unknown) {
-      displayMessage(err instanceof Error ? err.message : String(err), true);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: `Archive Company: ${company.name} (${company.code})`,
+      message: `Historical integrity is strictly guaranteed: ${usage.tickets} tickets, ${usage.assets} assets, and ${usage.users} users will retain their original company reference.\n\nThis company will be deactivated from future ticket and inventory forms, but remains visible to Super Admins.`,
+      confirmText: 'Archive Company',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await archiveCompany(company.id, company.code);
+          displayMessage(`Company "${company.name}" archived successfully. Historical references preserved.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
   };
 
-  const handleRestoreCompany = async (company: Company) => {
-    if (!confirm(`Restore company "${company.name}" (${company.code}) to ACTIVE status?`)) return;
+  const handleRestoreCompany = (company: Company) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Restore Company: ${company.name}`,
+      message: `Restore company "${company.name}" (${company.code}) to ACTIVE status? It will become selectable again across new tickets and inventory items.`,
+      confirmText: 'Restore Company',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await restoreCompany(company.id);
+          displayMessage(`Company "${company.name}" restored to ACTIVE status.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
 
-    try {
-      await restoreCompany(company.id);
-      displayMessage(`Company "${company.name}" restored to ACTIVE status.`);
-    } catch (err: unknown) {
-      displayMessage(err instanceof Error ? err.message : String(err), true);
-    }
+  const handleDeleteCompany = (company: Company) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Permanently Delete Company: ${company.name}?`,
+      message: `Warning: This will permanently delete ${company.name} (${company.code}) from the database. Any users or assets assigned to this company will have their company reference removed.\n\nThis action cannot be undone.`,
+      confirmText: 'Delete Company',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await removeCompany(company.id, company.code);
+          displayMessage(`Company "${company.name}" has been permanently deleted.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
+
+  const handleDeleteAllCompanies = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete ALL Companies?',
+      message: 'Critical warning: You are about to permanently delete all companies in the organization database. This action cannot be undone.',
+      confirmText: 'Delete All Companies',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await removeAllCompanies();
+          displayMessage('All companies have been permanently deleted.');
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
   };
 
   // ---------------------------------------------
@@ -249,32 +323,81 @@ export const MasterDataManager: React.FC = () => {
     }
   };
 
-  const handleArchiveLocation = async (location: Location) => {
+  const handleArchiveLocation = (location: Location) => {
     const usage = location.usageCount || { tickets: 0, assets: 0, users: 0 };
-    const confirmMsg =
-      `Archive location "${location.name}" (${location.code})?\n\n` +
-      `Historical integrity is guaranteed: ${usage.tickets} tickets, ${usage.assets} assets, and ${usage.users} users will retain their original location reference.\n\n` +
-      `This location will be disabled for new selections, but remains available to Super Admin.`;
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      await archiveLocation(location.id, location.code);
-      displayMessage(`Location "${location.name}" archived successfully. Historical references preserved.`);
-    } catch (err: unknown) {
-      displayMessage(err instanceof Error ? err.message : String(err), true);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: `Archive Location: ${location.name} (${location.code})`,
+      message: `Historical integrity is strictly guaranteed: ${usage.tickets} tickets, ${usage.assets} assets, and ${usage.users} users will retain their original location reference.\n\nThis location will be disabled from new selections, but remains accessible to Super Admin.`,
+      confirmText: 'Archive Location',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await archiveLocation(location.id, location.code);
+          displayMessage(`Location "${location.name}" archived successfully. Historical references preserved.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
   };
 
-  const handleRestoreLocation = async (location: Location) => {
-    if (!confirm(`Restore location "${location.name}" (${location.code}) to ACTIVE status?`)) return;
+  const handleRestoreLocation = (location: Location) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Restore Location: ${location.name}`,
+      message: `Restore location "${location.name}" (${location.code}) to ACTIVE status?`,
+      confirmText: 'Restore Location',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await restoreLocation(location.id);
+          displayMessage(`Location "${location.name}" restored to ACTIVE status.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
 
-    try {
-      await restoreLocation(location.id);
-      displayMessage(`Location "${location.name}" restored to ACTIVE status.`);
-    } catch (err: unknown) {
-      displayMessage(err instanceof Error ? err.message : String(err), true);
-    }
+  const handleDeleteLocation = (location: Location) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Permanently Delete Location: ${location.name}?`,
+      message: `Warning: This will permanently delete ${location.name} (${location.code}) from the database. Any users or assets assigned to this location will have their location reference removed.\n\nThis action cannot be undone.`,
+      confirmText: 'Delete Location',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await removeLocation(location.id, location.code);
+          displayMessage(`Location "${location.name}" has been permanently deleted.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
+
+  const handleDeleteAllLocations = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete ALL Locations?',
+      message: 'Critical warning: You are about to permanently delete all locations in the organization database. This action cannot be undone.',
+      confirmText: 'Delete All Locations',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await removeAllLocations();
+          displayMessage('All locations have been permanently deleted.');
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
   };
 
   // ---------------------------------------------
@@ -329,32 +452,100 @@ export const MasterDataManager: React.FC = () => {
     }
   };
 
-  const handleArchiveDepartment = async (dept: Department) => {
+  const handleArchiveDepartment = (dept: Department) => {
     const usage = dept.usageCount || { tickets: 0, assets: 0, users: 0 };
-    const confirmMsg =
-      `Archive department "${dept.name}" (${dept.code})?\n\n` +
-      `Historical integrity is guaranteed: ${usage.tickets} tickets, ${usage.assets} assets, and ${usage.users} users will retain their original department reference.\n\n` +
-      `This department will be disabled from employee dropdowns for new tickets, but remains available to Super Admin.`;
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      await archiveDepartment(dept.id, dept.code);
-      displayMessage(`Department "${dept.name}" archived successfully. Historical references preserved.`);
-    } catch (err: unknown) {
-      displayMessage(err instanceof Error ? err.message : String(err), true);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: `Archive Department: ${dept.name} (${dept.code})`,
+      message: `Historical integrity is strictly guaranteed: ${usage.tickets} tickets, ${usage.assets} assets, and ${usage.users} users will retain their original department reference.\n\nThis department will be disabled from employee dropdowns for new tickets, but remains accessible to Super Admin.`,
+      confirmText: 'Archive Department',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await archiveDepartment(dept.id, dept.code);
+          displayMessage(`Department "${dept.name}" archived successfully. Historical references preserved.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
   };
 
-  const handleRestoreDepartment = async (dept: Department) => {
-    if (!confirm(`Restore department "${dept.name}" (${dept.code}) to ACTIVE status?`)) return;
+  const handleRestoreDepartment = (dept: Department) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Restore Department: ${dept.name}`,
+      message: `Restore department "${dept.name}" (${dept.code}) to ACTIVE status?`,
+      confirmText: 'Restore Department',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await restoreDepartment(dept.id);
+          displayMessage(`Department "${dept.name}" restored to ACTIVE status.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
 
-    try {
-      await restoreDepartment(dept.id);
-      displayMessage(`Department "${dept.name}" restored to ACTIVE status.`);
-    } catch (err: unknown) {
-      displayMessage(err instanceof Error ? err.message : String(err), true);
-    }
+  const handleDeleteDepartment = (dept: Department) => {
+    setConfirmModal({
+      isOpen: true,
+      title: `Permanently Delete Department: ${dept.name}?`,
+      message: `Warning: This will permanently delete ${dept.name} (${dept.code}) from the database. Any users or assets assigned to this department will have their department reference removed.\n\nThis action cannot be undone.`,
+      confirmText: 'Delete Department',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await removeDepartment(dept.id, dept.code);
+          displayMessage(`Department "${dept.name}" has been permanently deleted.`);
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
+
+  const handleDeleteAllDepartments = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete ALL Departments?',
+      message: 'Critical warning: You are about to permanently delete all departments in the organization database. This action cannot be undone.',
+      confirmText: 'Delete All Departments',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await removeAllDepartments();
+          displayMessage('All departments have been permanently deleted.');
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
+  };
+
+  const handlePurgeDemoData = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Purge All Demo Data?',
+      message: 'This will purge all demo tickets, assets, notifications, comments, and demo accounts. Your Super Admin account and current master-data will remain intact.\n\nProceed with purge?',
+      confirmText: 'Purge Demo Data',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await purgeDemoData();
+          displayMessage('All demo tickets, assets, and demo users have been purged successfully.');
+        } catch (err: unknown) {
+          displayMessage(err instanceof Error ? err.message : String(err), true);
+        }
+      },
+    });
   };
 
   return (
@@ -392,19 +583,71 @@ export const MasterDataManager: React.FC = () => {
           )}
 
           {isSuperAdmin && (
-            activeTab === 'companies' ? (
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreateCompany}>
-                Add Company
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Trash2}
+                onClick={handlePurgeDemoData}
+                className="text-amber-700 dark:text-amber-400 hover:text-amber-800 hover:bg-amber-100/60 dark:hover:bg-amber-950/60 text-xs border border-amber-300 dark:border-amber-800 font-semibold"
+                title="Purge all demo tickets, assets, comments, and demo accounts"
+              >
+                Clear Demo Data
               </Button>
-            ) : activeTab === 'locations' ? (
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreateLocation}>
-                Add Location
-              </Button>
-            ) : (
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreateDepartment}>
-                Add Department
-              </Button>
-            )
+
+              {activeTab === 'companies' && (companies || []).length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={handleDeleteAllCompanies}
+                  className="text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-xs border border-rose-200 dark:border-rose-900"
+                  title="Permanently delete all companies from the database"
+                >
+                  Delete All
+                </Button>
+              )}
+
+              {activeTab === 'locations' && (locations || []).length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={handleDeleteAllLocations}
+                  className="text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-xs border border-rose-200 dark:border-rose-900"
+                  title="Permanently delete all locations from the database"
+                >
+                  Delete All
+                </Button>
+              )}
+
+              {activeTab === 'departments' && (departments || []).length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon={Trash2}
+                  onClick={handleDeleteAllDepartments}
+                  className="text-rose-600 dark:text-rose-400 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-xs border border-rose-200 dark:border-rose-900"
+                  title="Permanently delete all departments from the database"
+                >
+                  Delete All
+                </Button>
+              )}
+
+              {activeTab === 'companies' ? (
+                <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreateCompany}>
+                  Add Company
+                </Button>
+              ) : activeTab === 'locations' ? (
+                <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreateLocation}>
+                  Add Location
+                </Button>
+              ) : (
+                <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreateDepartment}>
+                  Add Department
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -452,9 +695,9 @@ export const MasterDataManager: React.FC = () => {
           }`}
         >
           <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          <span>Companies ({companies.length})</span>
+          <span>Companies ({(companies || []).length})</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200/60 dark:border-indigo-800">
-            {companies.filter((c) => !c.isArchived).length} Active
+            {(companies || []).filter((c) => !c.isArchived).length} Active
           </span>
         </button>
 
@@ -467,9 +710,9 @@ export const MasterDataManager: React.FC = () => {
           }`}
         >
           <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span>Locations ({locations.length})</span>
+          <span>Locations ({(locations || []).length})</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/60 dark:border-blue-800">
-            {locations.filter((l) => !l.isArchived).length} Active
+            {(locations || []).filter((l) => !l.isArchived).length} Active
           </span>
         </button>
 
@@ -482,9 +725,9 @@ export const MasterDataManager: React.FC = () => {
           }`}
         >
           <Briefcase className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span>Departments ({departments.length})</span>
+          <span>Departments ({(departments || []).length})</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-semibold border border-emerald-200/60 dark:border-emerald-800">
-            {departments.filter((d) => !d.isArchived).length} Active
+            {(departments || []).filter((d) => !d.isArchived).length} Active
           </span>
         </button>
       </div>
@@ -492,7 +735,18 @@ export const MasterDataManager: React.FC = () => {
       {/* Tab 1: Companies Grid */}
       {activeTab === 'companies' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {filteredCompanies.map((company) => {
+          {filteredCompanies.length === 0 ? (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+              <Building2 className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No companies found</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {(companies || []).length === 0
+                  ? "You have deleted or cleared all companies. Use 'Add Company' to create one."
+                  : "No companies match the current filter."}
+              </p>
+            </div>
+          ) : (
+            filteredCompanies.map((company) => {
             const usage = company.usageCount || { tickets: 0, assets: 0, users: 0 };
             return (
               <Card
@@ -554,6 +808,17 @@ export const MasterDataManager: React.FC = () => {
                             <span className="sr-only">Archive</span>
                           </Button>
                         )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => handleDeleteCompany(company)}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60"
+                          title="Permanently Delete Company"
+                        >
+                          <span className="sr-only">Delete</span>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -596,14 +861,25 @@ export const MasterDataManager: React.FC = () => {
                 </div>
               </Card>
             );
-          })}
+          }))}
         </div>
       )}
 
       {/* Tab 2: Locations Grid */}
       {activeTab === 'locations' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredLocations.map((location) => {
+          {filteredLocations.length === 0 ? (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+              <MapPin className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No locations found</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {(locations || []).length === 0
+                  ? "You have deleted or cleared all locations. Use 'Add Location' to create one."
+                  : "No locations match the current filter."}
+              </p>
+            </div>
+          ) : (
+            filteredLocations.map((location) => {
             const usage = location.usageCount || { tickets: 0, assets: 0, users: 0 };
             return (
               <Card
@@ -665,6 +941,17 @@ export const MasterDataManager: React.FC = () => {
                             <span className="sr-only">Archive</span>
                           </Button>
                         )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => handleDeleteLocation(location)}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60"
+                          title="Permanently Delete Location"
+                        >
+                          <span className="sr-only">Delete</span>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -710,14 +997,25 @@ export const MasterDataManager: React.FC = () => {
                 </div>
               </Card>
             );
-          })}
+          }))}
         </div>
       )}
 
       {/* Tab 3: Departments Grid (Super Admin Alone) */}
       {activeTab === 'departments' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDepartments.map((dept) => {
+          {filteredDepartments.length === 0 ? (
+            <div className="col-span-full p-8 text-center bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+              <Briefcase className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No departments found</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {(departments || []).length === 0
+                  ? "You have deleted or cleared all departments. Use 'Add Department' to create one."
+                  : "No departments match the current filter."}
+              </p>
+            </div>
+          ) : (
+            filteredDepartments.map((dept) => {
             const usage = dept.usageCount || { tickets: 0, assets: 0, users: 0 };
             return (
               <Card
@@ -779,6 +1077,17 @@ export const MasterDataManager: React.FC = () => {
                             <span className="sr-only">Archive</span>
                           </Button>
                         )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon={Trash2}
+                          onClick={() => handleDeleteDepartment(dept)}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60"
+                          title="Permanently Delete Department"
+                        >
+                          <span className="sr-only">Delete</span>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -816,7 +1125,7 @@ export const MasterDataManager: React.FC = () => {
                 </div>
               </Card>
             );
-          })}
+          }))}
         </div>
       )}
 
@@ -1048,6 +1357,18 @@ export const MasterDataManager: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Corporate Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        variant={confirmModal.variant}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

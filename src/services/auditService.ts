@@ -8,7 +8,7 @@ import {
   limit,
   onSnapshot,
 } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import { db, auth, removeUndefinedFields } from '../lib/firebase';
 import { AuditLog, OperationType, UserRole } from '../types';
 import { handleFirestoreError } from '../lib/errors';
 import { logger } from '../lib/logger';
@@ -46,7 +46,7 @@ export async function logAuditEvent(params: CreateAuditLogParams): Promise<strin
     ? JSON.stringify(params.details)
     : params.details || '';
 
-  const logEntry: AuditLog = {
+  const logEntry: Record<string, any> = {
     id: logId,
     timestamp: new Date().toISOString(),
     actorId: currentUser?.uid || 'system_bootstrap',
@@ -56,12 +56,19 @@ export async function logAuditEvent(params: CreateAuditLogParams): Promise<strin
     entityType: params.entityType,
     entityId: params.entityId,
     details: detailsString,
-    companyId: params.companyId,
-    locationId: params.locationId,
   };
 
+  if (params.companyId !== undefined && params.companyId !== null) {
+    logEntry.companyId = params.companyId;
+  }
+  if (params.locationId !== undefined && params.locationId !== null) {
+    logEntry.locationId = params.locationId;
+  }
+
+  const sanitizedEntry = removeUndefinedFields(logEntry);
+
   try {
-    await setDoc(doc(db, path, logId), logEntry);
+    await setDoc(doc(db, path, logId), sanitizedEntry);
     logger.info(`[Audit] ${params.action} on ${params.entityType}:${params.entityId}`, { logId });
     return logId;
   } catch (error) {

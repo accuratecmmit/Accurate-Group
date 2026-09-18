@@ -39,7 +39,7 @@ export const AuditLogViewer: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const filteredLogs = logs.filter((log) => {
+  const filteredLogs = (logs || []).filter((log) => {
     const matchesFilter = filterType === 'ALL' || log.entityType === filterType;
     const matchesSearch =
       searchTerm === '' ||

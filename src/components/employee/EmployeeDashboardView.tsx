@@ -18,6 +18,7 @@ import {
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { DateRangePicker, DateFilterState } from '../dashboard/DateRangePicker';
 import {
   Ticket,
   Laptop,
@@ -71,6 +72,11 @@ export const EmployeeDashboardView: React.FC<EmployeeDashboardViewProps> = ({
   // Filters for My Tickets
   const [ticketStatusFilter, setTicketStatusFilter] = useState<string>('ALL');
   const [ticketSearchTerm, setTicketSearchTerm] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState<DateFilterState>({
+    preset: 'ALL',
+    startDate: '',
+    endDate: '',
+  });
 
   // Notifications Filter Tab
   const [notifTab, setNotifTab] = useState<'UNREAD' | 'ALL'>('UNREAD');
@@ -153,15 +159,48 @@ export const EmployeeDashboardView: React.FC<EmployeeDashboardViewProps> = ({
   };
 
   // Ticket Summary Counts
-  const totalMyTickets = tickets.length;
-  const newCount = tickets.filter((t) => t.status === 'NEW').length;
-  const inProgressCount = tickets.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'OPEN').length;
-  const waitingForUserCount = tickets.filter((t) => t.status === 'PENDING_USER').length;
-  const resolvedCount = tickets.filter((t) => t.status === 'RESOLVED').length;
-  const closedCount = tickets.filter((t) => t.status === 'CLOSED').length;
+  const totalMyTickets = (tickets || []).length;
+  const newCount = (tickets || []).filter((t) => t.status === 'NEW').length;
+  const inProgressCount = (tickets || []).filter((t) => t.status === 'IN_PROGRESS' || t.status === 'OPEN').length;
+  const waitingForUserCount = (tickets || []).filter((t) => t.status === 'PENDING_USER').length;
+  const resolvedCount = (tickets || []).filter((t) => t.status === 'RESOLVED').length;
+  const closedCount = (tickets || []).filter((t) => t.status === 'CLOSED').length;
 
   // Filtered Tickets
-  const filteredTickets = tickets.filter((t) => {
+  const filteredTickets = (tickets || []).filter((t) => {
+    // Date Filtering
+    if (dateFilter.preset !== 'ALL') {
+      const ticketDate = new Date(t.createdAt).getTime();
+      const now = new Date();
+      if (dateFilter.preset === 'TODAY') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+        if (ticketDate < start || ticketDate > end) return false;
+      } else if (dateFilter.preset === 'THIS_WEEK') {
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        const start = new Date(now.setDate(diff));
+        start.setHours(0, 0, 0, 0);
+        if (ticketDate < start.getTime()) return false;
+      } else if (dateFilter.preset === 'THIS_MONTH') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+        if (ticketDate < start) return false;
+      } else if (dateFilter.preset === 'LAST_MONTH') {
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+        const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999).getTime();
+        if (ticketDate < start || ticketDate > end) return false;
+      } else if (dateFilter.preset === 'CUSTOM') {
+        if (dateFilter.startDate) {
+          const start = new Date(dateFilter.startDate).getTime();
+          if (ticketDate < start) return false;
+        }
+        if (dateFilter.endDate) {
+          const end = new Date(`${dateFilter.endDate}T23:59:59.999Z`).getTime();
+          if (ticketDate > end) return false;
+        }
+      }
+    }
+
     const matchesSearch =
       t.ticketNumber.toLowerCase().includes(ticketSearchTerm.toLowerCase()) ||
       t.title.toLowerCase().includes(ticketSearchTerm.toLowerCase()) ||
@@ -180,8 +219,8 @@ export const EmployeeDashboardView: React.FC<EmployeeDashboardViewProps> = ({
   });
 
   // Filtered Notifications
-  const unreadNotifications = notifications.filter((n) => !n.isRead);
-  const displayedNotifications = notifTab === 'UNREAD' ? unreadNotifications : notifications;
+  const unreadNotifications = (notifications || []).filter((n) => !n.isRead);
+  const displayedNotifications = notifTab === 'UNREAD' ? unreadNotifications : (notifications || []);
 
   // Mark single notification read
   const handleMarkNotifRead = async (id: string, e: React.MouseEvent) => {
@@ -603,37 +642,45 @@ export const EmployeeDashboardView: React.FC<EmployeeDashboardViewProps> = ({
         {/* SECTION 2: MY TICKETS (Exact required columns) */}
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Ticket className="w-5 h-5 text-indigo-600" />
-                  My Tickets
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Track and manage your submitted IT helpdesk requests
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search my tickets..."
-                    value={ticketSearchTerm}
-                    onChange={(e) => setTicketSearchTerm(e.target.value)}
-                    className="pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-40 sm:w-52"
-                  />
+            <div className="flex flex-col gap-3 pb-5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-indigo-600" />
+                    My Tickets
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Track and manage your submitted IT helpdesk requests
+                  </p>
                 </div>
 
-                {ticketStatusFilter !== 'ALL' && (
-                  <button
-                    onClick={() => setTicketStatusFilter('ALL')}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40"
-                  >
-                    Clear Filter
-                  </button>
-                )}
+                <div className="flex items-center gap-2.5">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search my tickets..."
+                      value={ticketSearchTerm}
+                      onChange={(e) => setTicketSearchTerm(e.target.value)}
+                      className="pl-9 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-40 sm:w-52"
+                    />
+                  </div>
+
+                  {ticketStatusFilter !== 'ALL' && (
+                    <button
+                      onClick={() => setTicketStatusFilter('ALL')}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40"
+                    >
+                      Clear Status
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-2 pt-1 text-xs">
+                <span className="font-bold text-slate-400 uppercase text-[10px]">Filter Date:</span>
+                <DateRangePicker filter={dateFilter} onChange={setDateFilter} />
               </div>
             </div>
 

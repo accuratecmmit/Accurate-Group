@@ -39,6 +39,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Modal } from '../ui/Modal';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
   Ticket,
   Plus,
@@ -223,6 +224,22 @@ export const TicketManagementView: React.FC = () => {
 
   // Attachment upload inside detail pane
   const [isUploadingDetailAttachment, setIsUploadingDetailAttachment] = useState(false);
+
+  // Destructive Action Confirmation Dialog
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const isEmployee = effectiveRole === 'EMPLOYEE';
   const isTechnician = effectiveRole === 'IT_TECHNICIAN';
@@ -576,7 +593,7 @@ export const TicketManagementView: React.FC = () => {
   const handleSaveCurrentFilter = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFilterName.trim()) {
-      alert('Filter preset name is required.');
+      showError('Filter preset name is required.');
       return;
     }
     setIsSavingFilter(true);
@@ -622,23 +639,32 @@ export const TicketManagementView: React.FC = () => {
     }
   };
 
-  const handleDeleteSavedFilter = async (filterId: string, filterName: string, e: React.MouseEvent) => {
+  const handleDeleteSavedFilter = (filterId: string, filterName: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Are you sure you want to remove saved filter "${filterName}"?`)) return;
-    try {
-      const res = await deleteSavedFilter(filterId);
-      if (res.success) {
-        setSavedFiltersList((prev) => prev.filter((f) => f.id !== filterId));
-        if (activeSavedFilterId === filterId) {
-          setActiveSavedFilterId(null);
+    setConfirmDialogConfig({
+      isOpen: true,
+      title: 'Remove Saved Filter',
+      message: `Are you sure you want to remove saved filter "${filterName}"?`,
+      confirmText: 'Remove Filter',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialogConfig((prev) => ({ ...prev, isOpen: false }));
+        try {
+          const res = await deleteSavedFilter(filterId);
+          if (res.success) {
+            setSavedFiltersList((prev) => prev.filter((f) => f.id !== filterId));
+            if (activeSavedFilterId === filterId) {
+              setActiveSavedFilterId(null);
+            }
+            showSuccess(`Saved filter "${filterName}" deleted.`);
+          } else {
+            showError(res.error || 'Failed to delete filter.');
+          }
+        } catch (err: any) {
+          showError(err.message || 'Error deleting filter');
         }
-        showSuccess(`Saved filter "${filterName}" deleted.`);
-      } else {
-        showError(res.error || 'Failed to delete filter.');
-      }
-    } catch (err: any) {
-      showError(err.message || 'Error deleting filter');
-    }
+      },
+    });
   };
 
   const handleResetFilters = async () => {
@@ -817,41 +843,49 @@ export const TicketManagementView: React.FC = () => {
   };
 
   // Handle delete attachment
-  const handleDeleteAttachment = async (attId: string, fileName: string) => {
+  const handleDeleteAttachment = (attId: string, fileName: string) => {
     if (!selectedTicket) return;
-    if (!confirm(`Are you sure you want to remove attachment "${fileName}"?`)) return;
-
-    try {
-      const res = await deleteTicketAttachment(selectedTicket.id, attId);
-      if (res.success) {
-        setTicketAttachments((prev) => prev.filter((a) => a.id !== attId));
-        showSuccess(`Attachment "${fileName}" removed.`);
-        await loadSelectedTicketDetails(selectedTicket.id);
-      } else {
-        showError(res.error || 'Failed to delete attachment.');
-      }
-    } catch (err: any) {
-      showError(err.message || 'Error deleting attachment.');
-    }
+    setConfirmDialogConfig({
+      isOpen: true,
+      title: 'Remove Attachment',
+      message: `Are you sure you want to remove attachment "${fileName}"? This will detach the file from the ticket.`,
+      confirmText: 'Remove Attachment',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialogConfig((prev) => ({ ...prev, isOpen: false }));
+        try {
+          const res = await deleteTicketAttachment(selectedTicket.id, attId);
+          if (res.success) {
+            setTicketAttachments((prev) => prev.filter((a) => a.id !== attId));
+            showSuccess(`Attachment "${fileName}" removed.`);
+            await loadSelectedTicketDetails(selectedTicket.id);
+          } else {
+            showError(res.error || 'Failed to delete attachment.');
+          }
+        } catch (err: any) {
+          showError(err.message || 'Error deleting attachment.');
+        }
+      },
+    });
   };
 
   // Handle create ticket submit
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
-      alert('Problem / Subject is mandatory (maximum 150 characters).');
+      showError('Problem / Subject is mandatory (maximum 150 characters).');
       return;
     }
     if (newTitle.trim().length > 150) {
-      alert('Problem / Subject cannot exceed 150 characters.');
+      showError('Problem / Subject cannot exceed 150 characters.');
       return;
     }
     if (!newDescription.trim()) {
-      alert('Description is mandatory (maximum 2,000 characters).');
+      showError('Description is mandatory (maximum 2,000 characters).');
       return;
     }
     if (newDescription.trim().length > 2000) {
-      alert('Description cannot exceed 2,000 characters.');
+      showError('Description cannot exceed 2,000 characters.');
       return;
     }
 
@@ -866,7 +900,7 @@ export const TicketManagementView: React.FC = () => {
       setOverrideReasonError(
         'Mandatory justification required: You are reporting an issue for equipment not currently assigned to you. Please provide a clear explanation.'
       );
-      alert('Mandatory justification required: Please provide an explicit reason for reporting on non-assigned equipment.');
+      showError('Mandatory justification required: Please provide an explicit reason for reporting on non-assigned equipment.');
       return;
     }
 
@@ -986,11 +1020,11 @@ export const TicketManagementView: React.FC = () => {
     if (!selectedTicket) return;
 
     if (!editTitle.trim() || editTitle.trim().length > 150) {
-      alert('Subject is required and must be at most 150 characters.');
+      showError('Subject is required and must be at most 150 characters.');
       return;
     }
     if (!editDescription.trim() || editDescription.trim().length > 2000) {
-      alert('Description is required and must be at most 2,000 characters.');
+      showError('Description is required and must be at most 2,000 characters.');
       return;
     }
 
@@ -1565,7 +1599,7 @@ export const TicketManagementView: React.FC = () => {
                   className="w-full px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium"
                 >
                   <option value="ALL">All Departments</option>
-                  {departments
+                  {(departments || [])
                     .filter((d) => !d.isArchived)
                     .map((dept) => (
                       <option key={dept.id} value={dept.id}>
@@ -1624,7 +1658,7 @@ export const TicketManagementView: React.FC = () => {
                   className="w-full px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-medium"
                 >
                   <option value="ALL">All Locations</option>
-                  {locations
+                  {(locations || [])
                     .filter((l) => !l.isArchived)
                     .map((loc) => (
                       <option key={loc.id} value={loc.id}>
@@ -2257,7 +2291,7 @@ export const TicketManagementView: React.FC = () => {
                                 className="flex-1 px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium"
                               >
                                 <option value="">-- Unassigned --</option>
-                                {activeTechnicians
+                                {(activeTechnicians || [])
                                   .filter((tech) => isSuperAdmin || tech.itTeamId === selectedTicket.assignedTeamId)
                                   .map((tech) => (
                                     <option key={tech.id} value={tech.id}>
@@ -2282,7 +2316,7 @@ export const TicketManagementView: React.FC = () => {
                                   className="flex-1 px-2.5 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-amber-300 text-slate-800 dark:text-slate-200 font-medium"
                                 >
                                   <option value="">-- Unassigned --</option>
-                                  {activeTechnicians
+                                  {(activeTechnicians || [])
                                     .filter((tech) => isSuperAdmin || tech.itTeamId === selectedTicket.assignedTeamId)
                                     .map((tech) => (
                                       <option key={tech.id} value={tech.id}>
@@ -2333,7 +2367,7 @@ export const TicketManagementView: React.FC = () => {
                             className="flex-1 px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                           >
                             <option value="">-- Unassigned (Auto-Route) --</option>
-                            {activeTechnicians
+                            {(activeTechnicians || [])
                               .filter((tech) => !selectedTicket.assignedTeamId || tech.itTeamId === selectedTicket.assignedTeamId)
                               .map((tech) => (
                                 <option key={tech.id} value={tech.id}>
@@ -2935,7 +2969,7 @@ export const TicketManagementView: React.FC = () => {
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
               >
                 <option value="">-- Select Location --</option>
-                {locations
+                {(locations || [])
                   .filter((l) => !l.isArchived)
                   .map((loc) => (
                     <option key={loc.id} value={loc.id}>
@@ -3483,6 +3517,18 @@ export const TicketManagementView: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Corporate Confirmation Dialog for Destructive Actions */}
+      <ConfirmDialog
+        isOpen={confirmDialogConfig.isOpen}
+        title={confirmDialogConfig.title}
+        message={confirmDialogConfig.message}
+        confirmText={confirmDialogConfig.confirmText}
+        cancelText={confirmDialogConfig.cancelText}
+        variant={confirmDialogConfig.variant}
+        onConfirm={confirmDialogConfig.onConfirm}
+        onCancel={() => setConfirmDialogConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

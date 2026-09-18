@@ -10,7 +10,7 @@ import {
   orderBy,
   where,
 } from 'firebase/firestore';
-import { db, auth } from '../lib/firebase';
+import { db, auth, removeUndefinedFields } from '../lib/firebase';
 import {
   Company,
   Location,
@@ -38,9 +38,20 @@ import { getStoredToken } from './authService';
 
 function getAuthHeaders(): Record<string, string> {
   const token = getStoredToken();
+  let userEmail = auth.currentUser?.email || '';
+  if (!userEmail) {
+    try {
+      const stored = localStorage.getItem('accurate_auth_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        userEmail = parsed?.user?.email || '';
+      }
+    } catch {}
+  }
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(userEmail ? { 'x-user-email': userEmail, 'x-actor-email': userEmail } : {}),
   };
 }
 
@@ -302,7 +313,7 @@ export async function createCompany(
 
   // Sync to Firestore for real-time subscribers if connected
   try {
-    await setDoc(doc(db, 'companies', created.id), created);
+    await setDoc(doc(db, 'companies', created.id), removeUndefinedFields(created));
   } catch (err) {
     logger.warn('Non-blocking firestore sync notice for createCompany:', err);
   }
@@ -328,10 +339,10 @@ export async function updateCompany(
   const updated: Company = data.company;
 
   try {
-    await updateDoc(doc(db, 'companies', id), {
+    await updateDoc(doc(db, 'companies', id), removeUndefinedFields({
       ...updates,
       updatedAt: new Date().toISOString(),
-    });
+    }));
   } catch (err) {
     logger.warn('Non-blocking firestore sync notice for updateCompany:', err);
   }
@@ -395,7 +406,56 @@ export async function restoreCompany(id: string, actorRole: string): Promise<Com
 }
 
 export async function deleteCompany(id: string, code: string, actorRole: string): Promise<void> {
-  await archiveCompany(id, code, actorRole);
+  const res = await fetch(`/api/master/companies/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete company');
+  }
+
+  try {
+    const { deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'companies', id));
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for deleteCompany:', err);
+  }
+
+  await logAuditEvent({
+    action: 'COMPANY_DELETED',
+    entityType: 'COMPANY',
+    entityId: id,
+    details: `Super Admin permanently deleted company ${code}.`,
+  });
+}
+
+export async function deleteAllCompanies(actorRole: string): Promise<void> {
+  const res = await fetch('/api/master/companies/all', {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete all companies');
+  }
+
+  try {
+    const { getDocs, deleteDoc } = await import('firebase/firestore');
+    const snaps = await getDocs(collection(db, 'companies'));
+    for (const d of snaps.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for deleteAllCompanies:', err);
+  }
+
+  await logAuditEvent({
+    action: 'ALL_COMPANIES_DELETED',
+    entityType: 'COMPANY',
+    entityId: 'ALL',
+    details: 'Super Admin permanently deleted all companies.',
+  });
 }
 
 // ========================
@@ -441,7 +501,7 @@ export async function createLocation(
   const created: Location = data.location;
 
   try {
-    await setDoc(doc(db, 'locations', created.id), created);
+    await setDoc(doc(db, 'locations', created.id), removeUndefinedFields(created));
   } catch (err) {
     logger.warn('Non-blocking firestore sync notice for createLocation:', err);
   }
@@ -467,10 +527,10 @@ export async function updateLocation(
   const updated: Location = data.location;
 
   try {
-    await updateDoc(doc(db, 'locations', id), {
+    await updateDoc(doc(db, 'locations', id), removeUndefinedFields({
       ...updates,
       updatedAt: new Date().toISOString(),
-    });
+    }));
   } catch (err) {
     logger.warn('Non-blocking firestore sync notice for updateLocation:', err);
   }
@@ -534,7 +594,56 @@ export async function restoreLocation(id: string, actorRole: string): Promise<Lo
 }
 
 export async function deleteLocation(id: string, code: string, actorRole: string): Promise<void> {
-  await archiveLocation(id, code, actorRole);
+  const res = await fetch(`/api/master/locations/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete location');
+  }
+
+  try {
+    const { deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'locations', id));
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for deleteLocation:', err);
+  }
+
+  await logAuditEvent({
+    action: 'LOCATION_DELETED',
+    entityType: 'LOCATION',
+    entityId: id,
+    details: `Super Admin permanently deleted location ${code}.`,
+  });
+}
+
+export async function deleteAllLocations(actorRole: string): Promise<void> {
+  const res = await fetch('/api/master/locations/all', {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete all locations');
+  }
+
+  try {
+    const { getDocs, deleteDoc } = await import('firebase/firestore');
+    const snaps = await getDocs(collection(db, 'locations'));
+    for (const d of snaps.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for deleteAllLocations:', err);
+  }
+
+  await logAuditEvent({
+    action: 'ALL_LOCATIONS_DELETED',
+    entityType: 'LOCATION',
+    entityId: 'ALL',
+    details: 'Super Admin permanently deleted all locations.',
+  });
 }
 
 // ========================
@@ -580,7 +689,7 @@ export async function createDepartment(
   const created: Department = data.department;
 
   try {
-    await setDoc(doc(db, 'departments', created.id), created);
+    await setDoc(doc(db, 'departments', created.id), removeUndefinedFields(created));
   } catch (err) {
     logger.warn('Non-blocking firestore sync notice for createDepartment:', err);
   }
@@ -606,10 +715,10 @@ export async function updateDepartment(
   const updated: Department = data.department;
 
   try {
-    await updateDoc(doc(db, 'departments', id), {
+    await updateDoc(doc(db, 'departments', id), removeUndefinedFields({
       ...updates,
       updatedAt: new Date().toISOString(),
-    });
+    }));
   } catch (err) {
     logger.warn('Non-blocking firestore sync notice for updateDepartment:', err);
   }
@@ -674,7 +783,67 @@ export async function restoreDepartment(id: string, actorRole: string): Promise<
 }
 
 export async function deleteDepartment(id: string, code: string, actorRole: string): Promise<void> {
-  await archiveDepartment(id, code, actorRole);
+  const res = await fetch(`/api/master/departments/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete department');
+  }
+
+  try {
+    const { deleteDoc } = await import('firebase/firestore');
+    await deleteDoc(doc(db, 'departments', id));
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for deleteDepartment:', err);
+  }
+
+  await logAuditEvent({
+    action: 'DEPARTMENT_DELETED',
+    entityType: 'DEPARTMENT',
+    entityId: id,
+    details: `Super Admin permanently deleted department ${code}.`,
+  });
+}
+
+export async function deleteAllDepartments(actorRole: string): Promise<void> {
+  const res = await fetch('/api/master/departments/all', {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete all departments');
+  }
+
+  try {
+    const { getDocs, deleteDoc } = await import('firebase/firestore');
+    const snaps = await getDocs(collection(db, 'departments'));
+    for (const d of snaps.docs) {
+      await deleteDoc(d.ref);
+    }
+  } catch (err) {
+    logger.warn('Non-blocking firestore sync notice for deleteAllDepartments:', err);
+  }
+
+  await logAuditEvent({
+    action: 'ALL_DEPARTMENTS_DELETED',
+    entityType: 'DEPARTMENT',
+    entityId: 'ALL',
+    details: 'Super Admin permanently deleted all departments.',
+  });
+}
+
+export async function clearAllDemoData(): Promise<void> {
+  const res = await fetch('/api/admin/clear-demo-data', {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to clear demo data');
+  }
 }
 
 // ========================

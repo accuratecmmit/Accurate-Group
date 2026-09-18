@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useMasterData } from '../../context/MasterDataContext';
 
 export type NavSection =
+  | 'dashboard'
   | 'overview'
   | 'employee_dashboard'
   | 'employee_profile'
@@ -43,6 +44,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSelectSection
   const isEmployee = effectiveRole === 'EMPLOYEE';
 
   const navItems = [
+    {
+      id: 'dashboard' as NavSection,
+      label: isSuperAdmin
+        ? 'Executive Dashboard'
+        : isITAdmin
+        ? 'IT Admin Dashboard'
+        : isTechnician
+        ? 'Technician Dashboard'
+        : 'Dashboard',
+      icon: LayoutDashboard,
+      badge: isSuperAdmin ? 'Global' : isITAdmin ? 'Team Scope' : 'Active Tasks',
+      visible: !isEmployee,
+    },
     {
       id: 'employee_dashboard' as NavSection,
       label: 'Employee Dashboard',

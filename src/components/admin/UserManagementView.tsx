@@ -13,6 +13,8 @@ import {
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { Alert } from '../ui/Alert';
 import {
   Users,
   UserCheck,
@@ -72,14 +74,32 @@ export const UserManagementView: React.FC = () => {
   const [isResettingPass, setIsResettingPass] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
 
+  // Destructive Confirmation Dialog State
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    requiredInputText?: string;
+    loading?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const loadData = async () => {
     setIsLoading(true);
     setActionError(null);
     try {
       const data = await fetchAdminUsers();
-      setUsers(data.users);
-      setActiveSessions(data.activeSessions);
-      setAuditLogs(data.auditLogs);
+      setUsers(data.users || []);
+      setActiveSessions(data.activeSessions || []);
+      setAuditLogs(data.auditLogs || []);
     } catch (err: any) {
       setActionError(err.message || 'Failed to load user management data.');
     } finally {
@@ -111,7 +131,7 @@ export const UserManagementView: React.FC = () => {
   const handleConfirmReject = async () => {
     if (!rejectingUser) return;
     if (!rejectionReason.trim()) {
-      alert('A rejection reason is mandatory by corporate security policy.');
+      setActionError('A rejection reason is mandatory by corporate security policy.');
       return;
     }
     setIsRejecting(true);
@@ -143,7 +163,7 @@ export const UserManagementView: React.FC = () => {
   const handleGenerateTemporaryPassword = async () => {
     if (!resettingUser) return;
     if (!identityConfirmed) {
-      alert('You must verify the employee identity checklist before issuing a temporary password.');
+      setActionError('You must verify the employee identity checklist before issuing a temporary password.');
       return;
     }
     setIsResettingPass(true);
@@ -160,10 +180,7 @@ export const UserManagementView: React.FC = () => {
   };
 
   // 5. Terminate Sessions
-  const handleTerminateSession = async (options: { userId?: string; sessionId?: string; all?: boolean }) => {
-    if (options.all && !confirm('WARNING: Are you sure you want to terminate ALL active sessions across the entire system?')) {
-      return;
-    }
+  const executeTerminateSession = async (options: { userId?: string; sessionId?: string; all?: boolean }) => {
     try {
       const res = await adminTerminateSessions(options);
       showSuccess(res.message || 'Session(s) terminated.');
@@ -173,29 +190,58 @@ export const UserManagementView: React.FC = () => {
     }
   };
 
-  // 6. Toggle User Account Status (Disabled accounts invalidate all sessions)
-  const handleToggleStatus = async (user: UserProfile) => {
-    const nextStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
-    const confirmMsg = nextStatus === 'SUSPENDED'
-      ? `Are you sure you want to suspend @${user.username}? All active sessions will be terminated immediately.`
-      : `Re-activate account for @${user.username}?`;
-
-    if (!confirm(confirmMsg)) return;
-
-    try {
-      const res = await adminToggleUserStatus(user.id, nextStatus as any);
-      showSuccess(res.message || 'User status updated.');
-      await loadData();
-    } catch (e: any) {
-      setActionError(e.message || 'Status toggle failed.');
+  const handleTerminateSession = (options: { userId?: string; sessionId?: string; all?: boolean }) => {
+    if (options.all) {
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Emergency: Terminate All Global Sessions',
+        message: 'WARNING: Are you sure you want to terminate ALL active sessions across the entire system? All currently connected users and technicians will be signed out immediately.',
+        confirmText: 'Terminate All Sessions',
+        cancelText: 'Cancel',
+        variant: 'danger',
+        requiredInputText: 'TERMINATE',
+        onConfirm: async () => {
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+          await executeTerminateSession(options);
+        },
+      });
+      return;
     }
+    executeTerminateSession(options);
+  };
+
+  // 6. Toggle User Account Status (Disabled accounts invalidate all sessions)
+  const handleToggleStatus = (user: UserProfile) => {
+    const nextStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    const isSuspending = nextStatus === 'SUSPENDED';
+
+    setConfirmConfig({
+      isOpen: true,
+      title: isSuspending ? `Suspend Account @${user.username}` : `Activate Account @${user.username}`,
+      message: isSuspending
+        ? `Are you sure you want to suspend @${user.username}? All active sessions will be terminated immediately and they will be barred from signing in.`
+        : `Re-activate access for employee @${user.username}? They will be permitted to log in again.`,
+      confirmText: isSuspending ? 'Suspend Account' : 'Reactivate Account',
+      cancelText: 'Cancel',
+      variant: isSuspending ? 'danger' : 'info',
+      onConfirm: async () => {
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        try {
+          const res = await adminToggleUserStatus(user.id, nextStatus as any);
+          showSuccess(res.message || 'User status updated.');
+          await loadData();
+        } catch (e: any) {
+          setActionError(e.message || 'Status toggle failed.');
+        }
+      },
+    });
   };
 
   // Filtered users
-  const pendingUsers = users.filter((u) => u.status === 'PENDING_APPROVAL');
-  const nonPendingUsers = users.filter((u) => u.status !== 'PENDING_APPROVAL');
+  const pendingUsers = (users || []).filter((u) => u.status === 'PENDING_APPROVAL');
+  const nonPendingUsers = (users || []).filter((u) => u.status !== 'PENDING_APPROVAL');
 
-  const filteredUsers = users.filter((u) => {
+  const filteredUsers = (users || []).filter((u) => {
     const matchesSearch =
       u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (u.username && u.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -989,6 +1035,20 @@ export const UserManagementView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Corporate Confirmation Dialog for Destructive Actions */}
+      <ConfirmDialog
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+        requiredInputText={confirmConfig.requiredInputText}
+        loading={confirmConfig.loading}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

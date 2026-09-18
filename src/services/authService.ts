@@ -9,7 +9,7 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../lib/firebase';
+import { auth, db, googleProvider, removeUndefinedFields } from '../lib/firebase';
 import {
   UserProfile,
   UserRole,
@@ -386,9 +386,9 @@ export async function syncUserProfile(user: User): Promise<UserProfile> {
         displayName: user.displayName || user.email?.split('@')[0] || 'Internal User',
         photoURL: user.photoURL || undefined,
         role: initialRole,
-        companyId: isSuperAdminEmail ? 'ALL' : 'comp_apex',
-        locationId: isSuperAdminEmail ? 'ALL' : 'loc_nyc',
-        departmentId: isSuperAdminEmail ? 'dept_it' : 'dept_ops',
+        companyId: null,
+        locationId: null,
+        departmentId: null,
         itTeamId: null,
         jobTitle: isSuperAdminEmail ? 'Chief Information Officer' : 'Staff Member',
         designation: isSuperAdminEmail ? 'Chief Information Officer' : 'Staff Member',
@@ -401,7 +401,7 @@ export async function syncUserProfile(user: User): Promise<UserProfile> {
         updatedAt: now,
       };
 
-      await setDoc(userDocRef, newProfile);
+      await setDoc(userDocRef, removeUndefinedFields(newProfile));
 
       if (initialRole === 'SUPER_ADMIN') {
         await ensureAdminRecord(user.uid, user.email || '', initialRole);
