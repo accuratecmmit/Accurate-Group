@@ -751,7 +751,7 @@ function loadOrSeedData() {
       notifications = [];
       profileChangeRequests = [];
       users = (users || []).filter((u) => u.email?.toLowerCase() === 'accuratecmmit@gmail.com' || u.role === 'SUPER_ADMIN');
-      sessions = (sessions || []).filter((s) => s.userId === 'usr_super_admin');
+      sessions = (sessions || []).filter((s) => users.some((u) => u.id === s.userId));
 
       // Normalize master data entries for archived flags & historical preservation
       companies.forEach((c) => {
@@ -796,8 +796,8 @@ function loadOrSeedData() {
             currentEmployeeName: a.assignedUserName || 'Assigned User',
             assignmentDate: a.assignmentDate,
             transferDate: null,
-            assignedByUserId: 'usr_it_admin',
-            assignedByUserName: 'Sarah Jenkins',
+            assignedByUserId: 'usr_super_admin',
+            assignedByUserName: 'Accurate Chief Admin',
             action: 'INITIAL_ASSIGNMENT',
             notes: 'Initial assignment baseline preserved from inventory record.',
             createdAt: a.createdAt || now,
@@ -1052,7 +1052,7 @@ function loadOrSeedData() {
         code: 'HELP-L1',
         name: 'Tier 1 Service Desk & User Support',
         description: 'First-line incident triage, password resets, onboarding setups, and hardware dispatch.',
-        leadAdminId: 'usr_it_admin',
+        leadAdminId: 'usr_super_admin',
         status: 'ACTIVE',
         isDeleted: false,
         createdAt: now,
@@ -1164,264 +1164,148 @@ function loadOrSeedData() {
     });
   }
 
-  // Seed or Ensure Users
+  // Seed or Ensure Users:
+  // Root Super Admin: accurateadmin
+  // Super Admin 1: Sameer Tupe (password: Acculate@)
+  // Super Admin 2: Rahul Prasad (password: Accurate@)
+  // All demo users (itadmin, technician, demo employee accounts) permanently removed.
+  const superAdminCreds = hashPasswordSync('Admin#2026!');
+  const sameerCreds = hashPasswordSync('Acculate@');
+  const rahulCreds = hashPasswordSync('Accurate@');
+
+  const defaultUsers: StoredUser[] = [
+    {
+      id: 'usr_super_admin',
+      username: 'accurateadmin',
+      normalizedUsername: 'accurateadmin',
+      displayName: 'Accurate Chief Admin',
+      email: 'accuratecmmit@gmail.com',
+      role: 'SUPER_ADMIN',
+      itTeamId: null,
+      itTeamName: null,
+      companyId: 'comp_accurate',
+      companyName: 'Accurate Group',
+      departmentId: 'dept_it',
+      departmentName: 'Information Technology & Security',
+      designation: 'Chief Information Officer',
+      assetTag: 'AST-ADMIN-001',
+      locationId: 'loc_nyc',
+      locationName: 'New York Global HQ',
+      mobileNumber: '+1 (555) 019-2831',
+      status: 'ACTIVE',
+      passwordHash: superAdminCreds.hash,
+      passwordSalt: superAdminCreds.salt,
+      failedLoginAttempts: 0,
+      lockoutUntil: null,
+      mustChangePassword: false,
+      rejectionReason: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'usr_sameer_tupe',
+      username: 'Sameer Tupe',
+      normalizedUsername: 'sameer tupe',
+      displayName: 'Sameer Tupe',
+      email: 'sameer.tupe@accurategroup.com',
+      role: 'SUPER_ADMIN',
+      itTeamId: null,
+      itTeamName: null,
+      companyId: 'comp_accurate',
+      companyName: 'Accurate Group',
+      departmentId: 'dept_it',
+      departmentName: 'Information Technology & Security',
+      designation: 'Super Administrator',
+      assetTag: 'AST-ADMIN-002',
+      locationId: 'loc_nyc',
+      locationName: 'New York Global HQ',
+      mobileNumber: '+91 98765 43210',
+      status: 'ACTIVE',
+      passwordHash: sameerCreds.hash,
+      passwordSalt: sameerCreds.salt,
+      failedLoginAttempts: 0,
+      lockoutUntil: null,
+      mustChangePassword: false,
+      rejectionReason: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'usr_rahul_prasad',
+      username: 'Rahul Prasad',
+      normalizedUsername: 'rahul prasad',
+      displayName: 'Rahul Prasad',
+      email: 'rahul.prasad@accurategroup.com',
+      role: 'SUPER_ADMIN',
+      itTeamId: null,
+      itTeamName: null,
+      companyId: 'comp_accurate',
+      companyName: 'Accurate Group',
+      departmentId: 'dept_it',
+      departmentName: 'Information Technology & Security',
+      designation: 'Super Administrator',
+      assetTag: 'AST-ADMIN-003',
+      locationId: 'loc_nyc',
+      locationName: 'New York Global HQ',
+      mobileNumber: '+91 98765 43211',
+      status: 'ACTIVE',
+      passwordHash: rahulCreds.hash,
+      passwordSalt: rahulCreds.salt,
+      failedLoginAttempts: 0,
+      lockoutUntil: null,
+      mustChangePassword: false,
+      rejectionReason: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+
   if (users.length === 0) {
-    const superAdminCreds = hashPasswordSync('Admin#2026!');
-    const itAdminCreds = hashPasswordSync('ItAdmin#2026!');
-    const techCreds = hashPasswordSync('Tech#2026!');
-    const rahulCreds = hashPasswordSync('Rahul#2026!');
-    const ananyaCreds = hashPasswordSync('Ananya#2026!');
-    const vikramCreds = hashPasswordSync('Vikram#2026!');
-    const deepakCreds = hashPasswordSync('Temp#Deepak2026!');
-
-    users = [
-      {
-        id: 'usr_super_admin',
-        username: 'accurateadmin',
-        normalizedUsername: 'accurateadmin',
-        displayName: 'Accurate Chief Admin',
-        email: 'accuratecmmit@gmail.com',
-        role: 'SUPER_ADMIN',
-        itTeamId: null,
-        itTeamName: null,
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_it',
-        departmentName: 'Information Technology & Security',
-        designation: 'Chief Information Officer',
-        assetTag: 'AST-ADMIN-001',
-        locationId: 'loc_nyc',
-        locationName: 'New York Global HQ',
-        mobileNumber: '+1 (555) 019-2831',
-        status: 'ACTIVE',
-        passwordHash: superAdminCreds.hash,
-        passwordSalt: superAdminCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'usr_it_admin',
-        username: 'itadmin',
-        normalizedUsername: 'itadmin',
-        displayName: 'Sarah Jenkins',
-        email: 'itadmin@accurategroup.com',
-        role: 'IT_ADMIN',
-        itTeamId: 'team_tier1',
-        itTeamName: 'Tier 1 Service Desk & User Support',
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_it',
-        departmentName: 'Information Technology & Security',
-        designation: 'Senior IT Systems Administrator',
-        assetTag: 'AST-IT-102',
-        locationId: 'loc_nyc',
-        locationName: 'New York Global HQ',
-        mobileNumber: '+1 (555) 014-9822',
-        status: 'ACTIVE',
-        passwordHash: itAdminCreds.hash,
-        passwordSalt: itAdminCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'usr_technician',
-        username: 'technician',
-        normalizedUsername: 'technician',
-        displayName: 'Marcus Vance',
-        email: 'technician@accurategroup.com',
-        role: 'IT_TECHNICIAN',
-        itTeamId: 'team_tier1',
-        itTeamName: 'Tier 1 Service Desk & User Support',
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_it',
-        departmentName: 'Information Technology & Security',
-        designation: 'Tier 1 Support Technician',
-        assetTag: 'AST-TECH-204',
-        locationId: 'loc_sfo',
-        locationName: 'San Francisco Tech Hub',
-        mobileNumber: '+1 (555) 018-3721',
-        status: 'ACTIVE',
-        passwordHash: techCreds.hash,
-        passwordSalt: techCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'usr_rahul',
-        username: 'Rahul',
-        normalizedUsername: 'rahul',
-        displayName: 'Rahul Sharma',
-        email: 'rahul@accurategroup.com',
-        role: 'EMPLOYEE',
-        itTeamId: null,
-        itTeamName: null,
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_eng',
-        departmentName: 'Software Engineering & DevOps',
-        designation: 'Senior Software Engineer',
-        assetTag: 'AST-ENG-409',
-        locationId: 'loc_sfo',
-        locationName: 'San Francisco Tech Hub',
-        mobileNumber: '+1 (555) 012-7711',
-        status: 'ACTIVE',
-        passwordHash: rahulCreds.hash,
-        passwordSalt: rahulCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'usr_ananya',
-        username: 'Ananya',
-        normalizedUsername: 'ananya',
-        displayName: 'Ananya Patel',
-        email: 'ananya@accurategroup.com',
-        role: 'EMPLOYEE',
-        itTeamId: null,
-        itTeamName: null,
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_fin',
-        departmentName: 'Finance & Accounting',
-        designation: 'Financial Analyst',
-        assetTag: 'AST-FIN-112',
-        locationId: 'loc_nyc',
-        locationName: 'New York Global HQ',
-        mobileNumber: '+1 (555) 016-8833',
-        status: 'PENDING_APPROVAL',
-        passwordHash: ananyaCreds.hash,
-        passwordSalt: ananyaCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'usr_vikram',
-        username: 'Vikram',
-        normalizedUsername: 'vikram',
-        displayName: 'Vikram Malhotra',
-        email: 'vikram@accurategroup.com',
-        role: 'EMPLOYEE',
-        itTeamId: null,
-        itTeamName: null,
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_ops',
-        departmentName: 'Global Operations & Facilities',
-        designation: 'Operations Specialist',
-        assetTag: 'AST-OPS-305',
-        locationId: 'loc_lon',
-        locationName: 'London European Operations',
-        mobileNumber: '+44 20 7946 0912',
-        status: 'ACTIVE',
-        passwordHash: vikramCreds.hash,
-        passwordSalt: vikramCreds.salt,
-        failedLoginAttempts: 5,
-        lockoutUntil: lockoutTime,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: 'usr_deepak',
-        username: 'Deepak',
-        normalizedUsername: 'deepak',
-        displayName: 'Deepak Verma',
-        email: 'deepak@accurategroup.com',
-        role: 'EMPLOYEE',
-        itTeamId: null,
-        itTeamName: null,
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_hr',
-        departmentName: 'Human Resources & People Ops',
-        designation: 'HR Specialist',
-        assetTag: 'AST-HR-501',
-        locationId: 'loc_sin',
-        locationName: 'Singapore APAC Hub',
-        mobileNumber: '+65 6712 3456',
-        status: 'ACTIVE',
-        passwordHash: deepakCreds.hash,
-        passwordSalt: deepakCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: true,
-        temporaryPasswordGeneratedAt: now,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
+    users = [...defaultUsers];
   } else {
-    // Ensure all existing loaded users have proper RBAC fields
-    users.forEach((u) => {
-      if (u.id === 'usr_it_admin' && !u.itTeamId) {
-        u.itTeamId = 'team_tier1';
-        u.itTeamName = 'Tier 1 Service Desk & User Support';
-      } else if (u.id === 'usr_technician' && !u.itTeamId) {
-        u.itTeamId = 'team_tier1';
-        u.itTeamName = 'Tier 1 Service Desk & User Support';
-      } else if (u.role === 'EMPLOYEE') {
-        u.itTeamId = null;
-        u.itTeamName = null;
-      }
-      if (!u.companyId) {
-        u.companyId = 'comp_accurate';
-        u.companyName = 'Accurate Group';
-      }
-    });
+    // Purge any demo users (itadmin, technician, old demo employee rahul, ananya, vikram, deepak, infratech)
+    const demoUserIds = new Set(['usr_it_admin', 'usr_technician', 'usr_rahul', 'usr_ananya', 'usr_vikram', 'usr_deepak', 'usr_infra_tech']);
+    const demoUsernames = new Set(['itadmin', 'technician', 'rahul', 'ananya', 'vikram', 'deepak', 'infratech']);
+    users = users.filter((u) => !demoUserIds.has(u.id) && !demoUsernames.has(u.normalizedUsername?.toLowerCase()));
 
-    if (!users.some((u) => u.id === 'usr_infra_tech')) {
-      const techCreds = hashPasswordSync('Tech#2026!');
-      users.push({
-        id: 'usr_infra_tech',
-        username: 'infratech',
-        normalizedUsername: 'infratech',
-        displayName: 'Alex Rivers',
-        email: 'infratech@accurategroup.com',
-        role: 'IT_TECHNICIAN',
-        itTeamId: 'team_infra',
-        itTeamName: 'Infrastructure & Network Systems',
-        companyId: 'comp_accurate',
-        companyName: 'Accurate Group',
-        departmentId: 'dept_it',
-        departmentName: 'Information Technology & Security',
-        designation: 'Network Infrastructure Technician',
-        assetTag: 'AST-NET-551',
-        locationId: 'loc_lon',
-        locationName: 'London European Operations',
-        mobileNumber: '+44 20 7946 0888',
-        status: 'ACTIVE',
-        passwordHash: techCreds.hash,
-        passwordSalt: techCreds.salt,
-        failedLoginAttempts: 0,
-        lockoutUntil: null,
-        mustChangePassword: false,
-        rejectionReason: null,
-        createdAt: now,
-        updatedAt: now,
-      });
+    // Ensure Sameer Tupe exists with Super Admin access and requested password
+    const existingSameer = users.find(
+      (u) =>
+        u.id === 'usr_sameer_tupe' ||
+        u.normalizedUsername?.toLowerCase() === 'sameer tupe' ||
+        u.username?.toLowerCase() === 'sameer tupe' ||
+        u.normalizedUsername?.toLowerCase() === 'sameertupe' ||
+        u.email?.toLowerCase() === 'sameer.tupe@accurategroup.com'
+    );
+    if (!existingSameer) {
+      users.push(defaultUsers[1]);
+    } else {
+      existingSameer.role = 'SUPER_ADMIN';
+      existingSameer.status = 'ACTIVE';
+      existingSameer.passwordHash = sameerCreds.hash;
+      existingSameer.passwordSalt = sameerCreds.salt;
+      existingSameer.failedLoginAttempts = 0;
+      existingSameer.lockoutUntil = null;
+    }
+
+    // Ensure Rahul Prasad exists with Super Admin access and requested password
+    const existingRahul = users.find(
+      (u) =>
+        u.id === 'usr_rahul_prasad' ||
+        u.normalizedUsername?.toLowerCase() === 'rahul prasad' ||
+        u.username?.toLowerCase() === 'rahul prasad' ||
+        u.normalizedUsername?.toLowerCase() === 'rahulprasad' ||
+        u.email?.toLowerCase() === 'rahul.prasad@accurategroup.com'
+    );
+    if (!existingRahul) {
+      users.push(defaultUsers[2]);
+    } else {
+      existingRahul.role = 'SUPER_ADMIN';
+      existingRahul.status = 'ACTIVE';
+      existingRahul.passwordHash = rahulCreds.hash;
+      existingRahul.passwordSalt = rahulCreds.salt;
+      existingRahul.failedLoginAttempts = 0;
+      existingRahul.lockoutUntil = null;
     }
   }
 
@@ -2285,7 +2169,7 @@ function loadOrSeedData() {
   notifications = [];
   profileChangeRequests = [];
   users = (users || []).filter((u) => u.email?.toLowerCase() === 'accuratecmmit@gmail.com' || u.role === 'SUPER_ADMIN');
-  sessions = (sessions || []).filter((s) => s.userId === 'usr_super_admin');
+  sessions = (sessions || []).filter((s) => users.some((u) => u.id === s.userId));
 
   // Retain assets: Do NOT wipe hardware inventory!
   if (!loadedFromDisk && (!assets || assets.length === 0)) {
@@ -2684,7 +2568,27 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
     }
 
     const normalized = username.trim().toLowerCase();
-    const user = users.find((u) => u.normalizedUsername === normalized || u.email.toLowerCase() === normalized);
+    const compactNormalized = normalized.replace(/[\s._-]+/g, '');
+    const user = users.find((u) => {
+      const uNorm = (u.normalizedUsername || '').toLowerCase();
+      const uName = (u.username || '').toLowerCase();
+      const uDisplay = (u.displayName || '').toLowerCase();
+      const uEmail = (u.email || '').toLowerCase();
+      return (
+        uNorm === normalized ||
+        uName === normalized ||
+        uDisplay === normalized ||
+        uEmail === normalized ||
+        uNorm.replace(/[\s._-]+/g, '') === compactNormalized ||
+        uName.replace(/[\s._-]+/g, '') === compactNormalized ||
+        uDisplay.replace(/[\s._-]+/g, '') === compactNormalized ||
+        (compactNormalized.length >= 4 && (
+          uNorm.replace(/[\s._-]+/g, '').startsWith(compactNormalized) ||
+          uName.replace(/[\s._-]+/g, '').startsWith(compactNormalized) ||
+          uDisplay.replace(/[\s._-]+/g, '').startsWith(compactNormalized)
+        ))
+      );
+    });
 
     if (!user) {
       // Avoid revealing user existence for security, but report invalid credentials
@@ -8377,7 +8281,18 @@ function parseAndValidateInventoryRows(rawRows: any[]): {
           l.id.toLowerCase() === locationStr.toLowerCase())
     );
     if (!matchedLocation && locationStr) {
-      matchedLocation = { id: `loc_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`, name: locationStr, code: locationStr.slice(0, 8).toUpperCase(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      matchedLocation = {
+        id: `loc_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+        name: locationStr,
+        code: locationStr.slice(0, 8).toUpperCase(),
+        city: 'Main City',
+        country: 'IN',
+        status: 'ACTIVE',
+        isDeleted: false,
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
     }
 
     // Resolve Company Master Data (or fallback gracefully)
@@ -8389,7 +8304,16 @@ function parseAndValidateInventoryRows(rawRows: any[]): {
           c.id.toLowerCase() === companyStr.toLowerCase())
     );
     if (!matchedCompany && companyStr) {
-      matchedCompany = { id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`, name: companyStr, code: companyStr.slice(0, 8).toUpperCase(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      matchedCompany = {
+        id: `comp_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+        name: companyStr,
+        code: companyStr.slice(0, 8).toUpperCase(),
+        status: 'ACTIVE',
+        isDeleted: false,
+        isArchived: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
     }
 
     // Resolve Department Master Data
@@ -10544,7 +10468,7 @@ app.post('/api/admin/clear-demo-data', requireSuperAdmin, (req: Request, res: Re
   notifications = [];
   profileChangeRequests = [];
   users = users.filter((u) => u.email.toLowerCase() === 'accuratecmmit@gmail.com' || u.role === 'SUPER_ADMIN');
-  sessions = sessions.filter((s) => s.userId === 'usr_super_admin');
+  sessions = sessions.filter((s) => users.some((u) => u.id === s.userId));
   persistData();
 
   logAudit(
