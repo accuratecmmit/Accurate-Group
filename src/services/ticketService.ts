@@ -1,4 +1,5 @@
 import { getStoredToken } from './authService';
+import { parseResponseJson } from '../lib/apiClient';
 
 export interface StoredTicketAttachment {
   id: string;
@@ -106,7 +107,8 @@ export async function fetchTickets(): Promise<{ tickets: StoredTicket[]; error?:
     const res = await fetch('/api/tickets', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { tickets: [], error: data.error || 'Failed to fetch tickets' };
     }
@@ -127,7 +129,8 @@ export async function fetchTicketById(id: string): Promise<{
     const res = await fetch(`/api/tickets/${id}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { error: data.error || 'Failed to fetch ticket' };
     }
@@ -167,7 +170,8 @@ export async function createTicket(payload: {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return {
         success: false,
@@ -192,7 +196,8 @@ export async function updateTicketLinkedAsset(
       headers: getAuthHeaders(),
       body: JSON.stringify({ relatedAssetId, notes }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update linked asset' };
     }
@@ -220,7 +225,8 @@ export async function editTicket(
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update ticket' };
     }
@@ -240,7 +246,8 @@ export async function cancelTicket(
       headers: getAuthHeaders(),
       body: JSON.stringify({ reason }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to cancel ticket' };
     }
@@ -258,7 +265,8 @@ export async function takeTicket(
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to take ticket' };
     }
@@ -278,7 +286,8 @@ export async function updateTicketStatus(
       headers: getAuthHeaders(),
       body: JSON.stringify({ status }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update ticket status' };
     }
@@ -298,7 +307,8 @@ export async function updateTicketPriority(
       headers: getAuthHeaders(),
       body: JSON.stringify({ priority }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update priority' };
     }
@@ -319,7 +329,8 @@ export async function assignTicket(
       headers: getAuthHeaders(),
       body: JSON.stringify({ technicianId, isCorrection }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to assign ticket' };
     }
@@ -340,7 +351,8 @@ export async function addTicketComment(
       headers: getAuthHeaders(),
       body: JSON.stringify({ content, isInternalOnly }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to post comment' };
     }
@@ -364,7 +376,8 @@ export async function uploadTicketAttachment(
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to upload attachment' };
     }
@@ -383,7 +396,8 @@ export async function deleteTicketAttachment(
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to delete attachment' };
     }
@@ -400,7 +414,8 @@ export async function fetchTicketHistory(
     const res = await fetch(`/api/tickets/${ticketId}/history`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to fetch ticket history' };
     }
@@ -417,7 +432,8 @@ export async function fetchTicketComments(
     const res = await fetch(`/api/tickets/${ticketId}/comments`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to fetch ticket comments' };
     }
@@ -536,7 +552,8 @@ export async function fetchTicketsAdvanced(params: TicketQueryParams = {}): Prom
     const res = await fetch(`/api/tickets?${urlParams.toString()}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return {
         tickets: [],
@@ -581,7 +598,8 @@ export async function fetchActiveTechnicians(
     const res = await fetch(`/api/users/technicians${query}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { technicians: [], error: data.error || 'Failed to fetch technicians' };
     }
@@ -596,7 +614,8 @@ export async function fetchSavedFilters(): Promise<{ savedFilters: SavedFilter[]
     const res = await fetch('/api/tickets/saved-filters', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { savedFilters: [], error: data.error || 'Failed to fetch saved filters' };
     }
@@ -618,7 +637,8 @@ export async function createSavedFilter(data: {
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
-    const result = await res.json();
+    const parsed = await parseResponseJson(res);
+    const result = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: result.error || 'Failed to save filter' };
     }
@@ -638,7 +658,8 @@ export async function updateSavedFilter(
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
-    const result = await res.json();
+    const parsed = await parseResponseJson(res);
+    const result = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: result.error || 'Failed to update filter' };
     }
@@ -654,7 +675,8 @@ export async function deleteSavedFilter(id: string): Promise<{ success: boolean;
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    const result = await res.json();
+    const parsed = await parseResponseJson(res);
+    const result = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: result.error || 'Failed to delete saved filter' };
     }
@@ -673,7 +695,8 @@ export async function fetchSortingPreference(): Promise<{
     const res = await fetch('/api/user/sorting-preference', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (res.ok && data.sortingPreference) {
       return data.sortingPreference;
     }
@@ -693,7 +716,8 @@ export async function saveSortingPreference(pref: {
       headers: getAuthHeaders(),
       body: JSON.stringify(pref),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to persist sorting preference' };
     }

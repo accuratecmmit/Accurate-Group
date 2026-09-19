@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, removeUndefinedFields } from '../lib/firebase';
+import { parseResponseJson } from '../lib/apiClient';
 import {
   UserProfile,
   UserRole,
@@ -62,10 +63,11 @@ export async function registerEmployee(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      return { success: false, message: data.error || 'Registration failed', error: data.error };
+    const parsed = await parseResponseJson(res, 'Registration failed');
+    if (!parsed.ok || !parsed.data) {
+      return { success: false, message: parsed.error || 'Registration failed', error: parsed.error };
     }
+    const data = parsed.data;
     return { success: true, message: data.message, userId: data.userId };
   } catch (err: any) {
     logger.error('Registration network error', err);
@@ -87,9 +89,17 @@ export async function loginUser(username: string, password: string): Promise<Log
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res, 'Login failed');
 
-    if (!res.ok) {
+    if (!parsed.ok || !parsed.data) {
+      return {
+        success: false,
+        error: parsed.error || 'Login failed',
+      };
+    }
+
+    const data = parsed.data;
+    if (data.error && !data.token) {
       return {
         success: false,
         error: data.error || 'Login failed',
@@ -145,7 +155,12 @@ export async function verifyCurrentSession(): Promise<{
       clearStoredToken();
       return { valid: false };
     }
-    const data = await res.json();
+    const parsed = await parseResponseJson(res, 'Session check failed');
+    if (!parsed.ok || !parsed.data) {
+      clearStoredToken();
+      return { valid: false };
+    }
+    const data = parsed.data;
     return {
       valid: true,
       user: data.user,
@@ -171,10 +186,11 @@ export async function changePassword(
       headers: getAuthHeaders(),
       body: JSON.stringify({ newPassword, confirmPassword }),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      return { success: false, error: data.error || 'Failed to update password' };
+    const parsed = await parseResponseJson(res, 'Failed to update password');
+    if (!parsed.ok || !parsed.data) {
+      return { success: false, error: parsed.error || 'Failed to update password' };
     }
+    const data = parsed.data;
     return { success: true, message: data.message };
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error' };
@@ -210,9 +226,9 @@ export async function logoutAllDevices(): Promise<{ success: boolean; message?: 
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
     clearStoredToken();
-    return { success: true, message: data.message };
+    return { success: true, message: parsed.data?.message || 'All devices logged out' };
   } catch (err: any) {
     clearStoredToken();
     return { success: true, message: 'All devices logged out' };
@@ -232,10 +248,11 @@ export async function fetchAdminUsers(): Promise<{
     method: 'GET',
     headers: getAuthHeaders(),
   });
-  if (!res.ok) {
-    throw new Error('Failed to fetch users from server.');
+  const parsed = await parseResponseJson(res, 'Failed to fetch users from server.');
+  if (!parsed.ok || !parsed.data) {
+    throw new Error(parsed.error || 'Failed to fetch users from server.');
   }
-  return await res.json();
+  return parsed.data;
 }
 
 export async function adminApproveUser(
@@ -247,9 +264,9 @@ export async function adminApproveUser(
     headers: getAuthHeaders(),
     body: JSON.stringify({ userId, role }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Approval failed');
-  return data;
+  const parsed = await parseResponseJson(res, 'Approval failed');
+  if (!parsed.ok || !parsed.data) throw new Error(parsed.error || 'Approval failed');
+  return parsed.data;
 }
 
 export async function adminRejectUser(
@@ -261,9 +278,9 @@ export async function adminRejectUser(
     headers: getAuthHeaders(),
     body: JSON.stringify({ userId, rejectionReason }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Rejection failed');
-  return data;
+  const parsed = await parseResponseJson(res, 'Rejection failed');
+  if (!parsed.ok || !parsed.data) throw new Error(parsed.error || 'Rejection failed');
+  return parsed.data;
 }
 
 export async function adminResetPassword(
@@ -275,9 +292,9 @@ export async function adminResetPassword(
     headers: getAuthHeaders(),
     body: JSON.stringify({ userId, customTemporaryPassword }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Password reset failed');
-  return data;
+  const parsed = await parseResponseJson(res, 'Password reset failed');
+  if (!parsed.ok || !parsed.data) throw new Error(parsed.error || 'Password reset failed');
+  return parsed.data;
 }
 
 export async function adminResetFailedAttempts(
@@ -288,9 +305,9 @@ export async function adminResetFailedAttempts(
     headers: getAuthHeaders(),
     body: JSON.stringify({ userId }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Reset counter failed');
-  return data;
+  const parsed = await parseResponseJson(res, 'Reset counter failed');
+  if (!parsed.ok || !parsed.data) throw new Error(parsed.error || 'Reset counter failed');
+  return parsed.data;
 }
 
 export async function adminTerminateSessions(options: {
@@ -303,9 +320,9 @@ export async function adminTerminateSessions(options: {
     headers: getAuthHeaders(),
     body: JSON.stringify(options),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Session termination failed');
-  return data;
+  const parsed = await parseResponseJson(res, 'Session termination failed');
+  if (!parsed.ok || !parsed.data) throw new Error(parsed.error || 'Session termination failed');
+  return parsed.data;
 }
 
 export async function adminToggleUserStatus(
@@ -317,9 +334,9 @@ export async function adminToggleUserStatus(
     headers: getAuthHeaders(),
     body: JSON.stringify({ userId, status }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Status change failed');
-  return data;
+  const parsed = await parseResponseJson(res, 'Status change failed');
+  if (!parsed.ok || !parsed.data) throw new Error(parsed.error || 'Status change failed');
+  return parsed.data;
 }
 
 // ==========================================

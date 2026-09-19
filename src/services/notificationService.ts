@@ -1,3 +1,4 @@
+import { parseResponseJson } from '../lib/apiClient';
 import { getStoredToken } from './authService';
 
 export interface UserNotification {
@@ -26,7 +27,8 @@ export async function fetchNotifications(): Promise<{ notifications: UserNotific
     const res = await fetch('/api/notifications', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { notifications: [], error: data.error || 'Failed to fetch notifications' };
     }
@@ -46,7 +48,8 @@ export async function markNotificationAsRead(id: string): Promise<{ success: boo
       method: 'PATCH',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to mark notification as read' };
     }
@@ -62,7 +65,8 @@ export async function markAllNotificationsAsRead(): Promise<{ success: boolean; 
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     return { success: res.ok };
   } catch {
     return { success: false };

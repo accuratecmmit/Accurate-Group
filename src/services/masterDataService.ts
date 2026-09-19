@@ -11,6 +11,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db, auth, removeUndefinedFields } from '../lib/firebase';
+import { parseResponseJson } from '../lib/apiClient';
 import {
   Company,
   Location,
@@ -63,7 +64,8 @@ export async function fetchMasterCompanies(includeArchived = false): Promise<{ c
     const res = await fetch(`/api/master/companies?includeArchived=${includeArchived}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { companies: [], error: data.error || 'Failed to fetch companies' };
     }
@@ -78,7 +80,8 @@ export async function fetchMasterLocations(includeArchived = false): Promise<{ l
     const res = await fetch(`/api/master/locations?includeArchived=${includeArchived}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { locations: [], error: data.error || 'Failed to fetch locations' };
     }
@@ -93,7 +96,8 @@ export async function fetchMasterDepartments(includeArchived = false): Promise<{
     const res = await fetch(`/api/master/departments?includeArchived=${includeArchived}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { departments: [], error: data.error || 'Failed to fetch departments' };
     }
@@ -304,7 +308,8 @@ export async function createCompany(
     headers: getAuthHeaders(),
     body: JSON.stringify(companyData),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to create company');
   }
@@ -331,7 +336,8 @@ export async function updateCompany(
     headers: getAuthHeaders(),
     body: JSON.stringify(updates),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to update company');
   }
@@ -358,7 +364,8 @@ export async function archiveCompany(id: string, code: string, actorRole: string
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to archive company');
   }
@@ -385,7 +392,8 @@ export async function restoreCompany(id: string, actorRole: string): Promise<Com
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to restore company');
   }
@@ -410,7 +418,8 @@ export async function deleteCompany(id: string, code: string, actorRole: string)
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to delete company');
   }
@@ -435,7 +444,8 @@ export async function deleteAllCompanies(actorRole: string): Promise<void> {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to delete all companies');
   }
@@ -493,7 +503,8 @@ export async function createLocation(
     headers: getAuthHeaders(),
     body: JSON.stringify(locationData),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to create location');
   }
@@ -519,7 +530,8 @@ export async function updateLocation(
     headers: getAuthHeaders(),
     body: JSON.stringify(updates),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to update location');
   }
@@ -546,7 +558,8 @@ export async function archiveLocation(id: string, code: string, actorRole: strin
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to archive location');
   }
@@ -573,7 +586,8 @@ export async function restoreLocation(id: string, actorRole: string): Promise<Lo
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to restore location');
   }
@@ -598,7 +612,8 @@ export async function deleteLocation(id: string, code: string, actorRole: string
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to delete location');
   }
@@ -623,7 +638,8 @@ export async function deleteAllLocations(actorRole: string): Promise<void> {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to delete all locations');
   }
@@ -681,7 +697,8 @@ export async function createDepartment(
     headers: getAuthHeaders(),
     body: JSON.stringify(departmentData),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to create department');
   }
@@ -707,7 +724,8 @@ export async function updateDepartment(
     headers: getAuthHeaders(),
     body: JSON.stringify(updates),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to update department');
   }
@@ -735,7 +753,8 @@ export async function archiveDepartment(id: string, code: string, actorRole: str
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to archive department');
   }
@@ -762,7 +781,8 @@ export async function restoreDepartment(id: string, actorRole: string): Promise<
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to restore department');
   }
@@ -787,7 +807,8 @@ export async function deleteDepartment(id: string, code: string, actorRole: stri
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to delete department');
   }
@@ -812,7 +833,8 @@ export async function deleteAllDepartments(actorRole: string): Promise<void> {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to delete all departments');
   }
@@ -840,7 +862,8 @@ export async function clearAllDemoData(): Promise<void> {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  const data = await res.json();
+  const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
   if (!res.ok) {
     throw new Error(data.error || 'Failed to clear demo data');
   }
@@ -916,7 +939,8 @@ export async function fetchServerAuditLogs(params?: {
     const res = await fetch(`/api/audit-logs?${qs.toString()}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { auditLogs: [], error: data.error || 'Failed to fetch audit logs' };
     }

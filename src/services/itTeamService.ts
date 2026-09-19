@@ -1,3 +1,4 @@
+import { parseResponseJson } from '../lib/apiClient';
 import { getStoredToken } from './authService';
 
 export interface ITTeam {
@@ -25,7 +26,8 @@ export async function fetchITTeams(): Promise<{ teams: ITTeam[]; error?: string 
     const res = await fetch('/api/it-teams', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { teams: [], error: data.error || 'Failed to fetch IT teams' };
     }
@@ -47,7 +49,8 @@ export async function createITTeam(payload: {
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to create IT Team' };
     }
@@ -67,7 +70,8 @@ export async function assignUserToTeam(
       headers: getAuthHeaders(),
       body: JSON.stringify({ userId, itTeamId }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to assign user to IT team' };
     }

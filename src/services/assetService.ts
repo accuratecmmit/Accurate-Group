@@ -1,4 +1,5 @@
 import { getStoredToken } from './authService';
+import { parseResponseJson } from '../lib/apiClient';
 import { Asset, AssetAssignmentRecord, AssetCustomField } from '../types';
 
 export type { Asset, AssetAssignmentRecord, AssetCustomField };
@@ -33,7 +34,8 @@ export async function fetchAssets(filters?: {
     const res = await fetch(`/api/assets${query}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { assets: [], error: data.error || 'Failed to fetch assets' };
     }
@@ -48,7 +50,8 @@ export async function fetchAssetById(id: string): Promise<{ asset?: Asset; error
     const res = await fetch(`/api/assets/${id}`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { error: data.error || 'Failed to fetch asset' };
     }
@@ -65,7 +68,8 @@ export async function createAsset(payload: Partial<Asset>): Promise<{ success: b
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to create asset' };
     }
@@ -85,7 +89,8 @@ export async function updateAsset(
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update asset' };
     }
@@ -101,7 +106,8 @@ export async function deleteOrRetireAsset(id: string): Promise<{ success: boolea
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to retire asset' };
     }
@@ -117,7 +123,8 @@ export async function fetchCustomFields(): Promise<{ customFields: AssetCustomFi
     const res = await fetch('/api/asset-custom-fields', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { customFields: [], error: data.error || 'Failed to fetch custom fields' };
     }
@@ -141,7 +148,8 @@ export async function createCustomField(field: {
       headers: getAuthHeaders(),
       body: JSON.stringify(field),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to create custom field' };
     }
@@ -161,7 +169,8 @@ export async function updateCustomField(
       headers: getAuthHeaders(),
       body: JSON.stringify(field),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update custom field' };
     }
@@ -203,7 +212,8 @@ export async function validateExcelRows(rows: any[]): Promise<{ success: boolean
       headers: getAuthHeaders(),
       body: JSON.stringify({ rows }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to validate Excel rows' };
     }
@@ -223,7 +233,8 @@ export async function importExcelRows(
       headers: getAuthHeaders(),
       body: JSON.stringify({ rows, overwriteExisting }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to import Excel rows' };
     }
@@ -246,7 +257,8 @@ export async function importInitialWorkbook(): Promise<{
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to import initial workbook' };
     }
@@ -286,7 +298,8 @@ export async function fetchMyAssignedAsset(): Promise<{ asset?: Asset | null; er
     const res = await fetch('/api/assets/my-assigned', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { error: data.error || 'Failed to fetch assigned equipment' };
     }
@@ -305,7 +318,8 @@ export async function fetchTicketSelectableAssets(): Promise<{
     const res = await fetch('/api/assets/ticket-options', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { myAsset: null, otherAssets: [], error: data.error || 'Failed to fetch ticket equipment options' };
     }
@@ -323,7 +337,8 @@ export async function fetchAssetTickets(assetId: string): Promise<{ tickets: any
     const res = await fetch(`/api/assets/${assetId}/tickets`, {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { tickets: [], totalCount: 0, error: data.error || 'Failed to fetch tickets for asset' };
     }

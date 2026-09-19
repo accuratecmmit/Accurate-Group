@@ -1,3 +1,4 @@
+import { parseResponseJson } from '../lib/apiClient';
 import { getStoredToken } from './authService';
 import { UserProfile, UserProfileChangeRequest } from '../types';
 import { StoredAsset } from './assetService';
@@ -25,7 +26,8 @@ export async function fetchUserProfile(): Promise<ProfileResponse> {
     const res = await fetch('/api/user/profile', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { error: data.error || 'Failed to fetch user profile' };
     }
@@ -55,7 +57,8 @@ export async function updateMobileNumber(mobileNumber: string): Promise<{
       headers: getAuthHeaders(),
       body: JSON.stringify({ mobileNumber }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to update mobile number' };
     }
@@ -97,7 +100,8 @@ export async function submitProfileChangeRequest(
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to submit profile change request' };
     }
@@ -122,7 +126,8 @@ export async function fetchProfileChangeRequests(): Promise<{
     const res = await fetch('/api/user/profile/change-requests', {
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { changeRequests: [], error: data.error || 'Failed to fetch change requests' };
     }
@@ -151,7 +156,8 @@ export async function reviewProfileChangeRequest(
       headers: getAuthHeaders(),
       body: JSON.stringify({ action, reviewNotes }),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || `Failed to ${action.toLowerCase()} request` };
     }
@@ -174,7 +180,8 @@ export async function markAllNotificationsRead(): Promise<{ success: boolean; co
       method: 'POST',
       headers: getAuthHeaders(),
     });
-    const data = await res.json();
+    const parsed = await parseResponseJson(res);
+    const data = parsed.data || {};
     if (!res.ok) {
       return { success: false, error: data.error || 'Failed to mark all as read' };
     }

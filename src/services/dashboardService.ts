@@ -1,4 +1,5 @@
 import { getStoredToken } from './authService';
+import { parseResponseJson } from '../lib/apiClient';
 
 export interface DashboardMetricsResponse {
   success: boolean;
@@ -121,10 +122,12 @@ export async function fetchDashboardMetrics(params: DashboardFilterParams = {}):
     },
   });
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to load dashboard metrics');
+  const parsed = await parseResponseJson<DashboardMetricsResponse>(res, 'Failed to load dashboard metrics');
+  if (!parsed.ok || !parsed.data) {
+    throw new Error(parsed.error || 'Failed to load dashboard metrics');
   }
+
+  const data = parsed.data as any;
 
   const metrics = data.metrics || data.summary || {
     totalTickets: 0,
@@ -209,10 +212,10 @@ export async function generateReport(req: GenerateReportRequest): Promise<Genera
     body: JSON.stringify(req),
   });
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to generate report');
+  const parsed = await parseResponseJson<GeneratedReportResponse>(res, 'Failed to generate report');
+  if (!parsed.ok || !parsed.data) {
+    throw new Error(parsed.error || 'Failed to generate report');
   }
 
-  return data;
+  return parsed.data;
 }

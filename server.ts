@@ -4527,6 +4527,137 @@ function sanitizeCommentContent(input: string): string {
 }
 
 /**
+ * GET /api/tickets/saved-filters
+ * Returns saved filters visible to the user: personal filters + organization-wide shared filters.
+ */
+app.get('/api/tickets/saved-filters', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user as StoredUser;
+  const visible = savedFilters.filter((f) => f.ownerId === user.id || f.isShared);
+  res.json({ success: true, savedFilters: visible });
+});
+
+/**
+ * POST /api/tickets/saved-filters
+ * Saves a new filter combination. Super Admins can set isShared: true for organization-wide access.
+ */
+app.post('/api/tickets/saved-filters', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user as StoredUser;
+  const { name, criteria, sortConfig, isShared } = req.body;
+
+  if (!name || !name.trim()) {
+    res.status(400).json({ error: 'Filter name is required.' });
+    return;
+  }
+
+  const shareRequested = Boolean(isShared);
+  if (shareRequested && user.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Forbidden: Only Super Admins can create shared organization-wide filters.' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const newFilter: StoredSavedFilter = {
+    id: `fltr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    name: name.trim(),
+    ownerId: user.id,
+    ownerName: user.displayName,
+    ownerRole: user.role,
+    isShared: shareRequested,
+    criteria: criteria || {},
+    sortConfig: sortConfig || { sortBy: 'updatedAt', sortOrder: 'desc' },
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  savedFilters.unshift(newFilter);
+  persistData();
+
+  logAudit(
+    { id: user.id, email: user.email, role: user.role },
+    'SAVED_FILTER_CREATED',
+    'SAVED_FILTER',
+    newFilter.id,
+    `${user.role} ${user.displayName} created saved filter "${newFilter.name}" (Shared: ${newFilter.isShared}).`,
+    req
+  );
+
+  res.status(201).json({ success: true, savedFilter: newFilter });
+});
+
+/**
+ * PUT /api/tickets/saved-filters/:id
+ * Updates an existing saved filter.
+ */
+app.put('/api/tickets/saved-filters/:id', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user as StoredUser;
+  const { id } = req.params;
+  const { name, criteria, sortConfig, isShared } = req.body;
+
+  const filter = savedFilters.find((f) => f.id === id);
+  if (!filter) {
+    res.status(404).json({ error: 'Saved filter not found.' });
+    return;
+  }
+
+  if (filter.ownerId !== user.id && user.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Forbidden: You can only edit your own saved filters.' });
+    return;
+  }
+
+  if (isShared !== undefined && isShared !== filter.isShared) {
+    if (user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Forbidden: Only Super Admins can toggle organization-wide sharing.' });
+      return;
+    }
+    filter.isShared = Boolean(isShared);
+  }
+
+  if (name && name.trim()) filter.name = name.trim();
+  if (criteria !== undefined) filter.criteria = criteria;
+  if (sortConfig !== undefined) filter.sortConfig = sortConfig;
+  filter.updatedAt = new Date().toISOString();
+
+  persistData();
+  res.json({ success: true, savedFilter: filter });
+});
+
+/**
+ * DELETE /api/tickets/saved-filters/:id
+ * Removes a saved filter.
+ */
+app.delete('/api/tickets/saved-filters/:id', requireAuth, (req: Request, res: Response) => {
+  const user = (req as any).user as StoredUser;
+  const { id } = req.params;
+
+  const index = savedFilters.findIndex((f) => f.id === id);
+  if (index === -1) {
+    res.status(404).json({ error: 'Saved filter not found.' });
+    return;
+  }
+
+  const filter = savedFilters[index];
+  if (filter.ownerId !== user.id && user.role !== 'SUPER_ADMIN') {
+    res.status(403).json({ error: 'Forbidden: You can only delete your own saved filters.' });
+    return;
+  }
+
+  savedFilters.splice(index, 1);
+  persistData();
+
+  logAudit(
+    { id: user.id, email: user.email, role: user.role },
+    'SAVED_FILTER_DELETED',
+    'SAVED_FILTER',
+    id,
+    `${user.role} ${user.displayName} deleted saved filter "${filter.name}".`,
+    req
+  );
+
+  res.json({ success: true, message: 'Saved filter deleted successfully.' });
+});
+
+
+/**
  * GET /api/tickets/:id
  * Retrieves a single ticket and its communication thread, attachments, and history.
  * Scoped according to RBAC. Internal technician notes stripped for Employees.
@@ -6241,136 +6372,6 @@ app.post('/api/user/sorting-preference', requireAuth, (req: Request, res: Respon
     success: true,
     sortingPreference: user.sortingPreference,
   });
-});
-
-/**
- * GET /api/tickets/saved-filters
- * Returns saved filters visible to the user: personal filters + organization-wide shared filters.
- */
-app.get('/api/tickets/saved-filters', requireAuth, (req: Request, res: Response) => {
-  const user = (req as any).user as StoredUser;
-  const visible = savedFilters.filter((f) => f.ownerId === user.id || f.isShared);
-  res.json({ success: true, savedFilters: visible });
-});
-
-/**
- * POST /api/tickets/saved-filters
- * Saves a new filter combination. Super Admins can set isShared: true for organization-wide access.
- */
-app.post('/api/tickets/saved-filters', requireAuth, (req: Request, res: Response) => {
-  const user = (req as any).user as StoredUser;
-  const { name, criteria, sortConfig, isShared } = req.body;
-
-  if (!name || !name.trim()) {
-    res.status(400).json({ error: 'Filter name is required.' });
-    return;
-  }
-
-  const shareRequested = Boolean(isShared);
-  if (shareRequested && user.role !== 'SUPER_ADMIN') {
-    res.status(403).json({ error: 'Forbidden: Only Super Admins can create shared organization-wide filters.' });
-    return;
-  }
-
-  const now = new Date().toISOString();
-  const newFilter: StoredSavedFilter = {
-    id: `fltr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    name: name.trim(),
-    ownerId: user.id,
-    ownerName: user.displayName,
-    ownerRole: user.role,
-    isShared: shareRequested,
-    criteria: criteria || {},
-    sortConfig: sortConfig || { sortBy: 'updatedAt', sortOrder: 'desc' },
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  savedFilters.unshift(newFilter);
-  persistData();
-
-  logAudit(
-    { id: user.id, email: user.email, role: user.role },
-    'SAVED_FILTER_CREATED',
-    'SAVED_FILTER',
-    newFilter.id,
-    `${user.role} ${user.displayName} created saved filter "${newFilter.name}" (Shared: ${newFilter.isShared}).`,
-    req
-  );
-
-  res.status(201).json({ success: true, savedFilter: newFilter });
-});
-
-/**
- * PUT /api/tickets/saved-filters/:id
- * Updates an existing saved filter.
- */
-app.put('/api/tickets/saved-filters/:id', requireAuth, (req: Request, res: Response) => {
-  const user = (req as any).user as StoredUser;
-  const { id } = req.params;
-  const { name, criteria, sortConfig, isShared } = req.body;
-
-  const filter = savedFilters.find((f) => f.id === id);
-  if (!filter) {
-    res.status(404).json({ error: 'Saved filter not found.' });
-    return;
-  }
-
-  if (filter.ownerId !== user.id && user.role !== 'SUPER_ADMIN') {
-    res.status(403).json({ error: 'Forbidden: You can only edit your own saved filters.' });
-    return;
-  }
-
-  if (isShared !== undefined && isShared !== filter.isShared) {
-    if (user.role !== 'SUPER_ADMIN') {
-      res.status(403).json({ error: 'Forbidden: Only Super Admins can toggle organization-wide sharing.' });
-      return;
-    }
-    filter.isShared = Boolean(isShared);
-  }
-
-  if (name && name.trim()) filter.name = name.trim();
-  if (criteria !== undefined) filter.criteria = criteria;
-  if (sortConfig !== undefined) filter.sortConfig = sortConfig;
-  filter.updatedAt = new Date().toISOString();
-
-  persistData();
-  res.json({ success: true, savedFilter: filter });
-});
-
-/**
- * DELETE /api/tickets/saved-filters/:id
- * Removes a saved filter.
- */
-app.delete('/api/tickets/saved-filters/:id', requireAuth, (req: Request, res: Response) => {
-  const user = (req as any).user as StoredUser;
-  const { id } = req.params;
-
-  const index = savedFilters.findIndex((f) => f.id === id);
-  if (index === -1) {
-    res.status(404).json({ error: 'Saved filter not found.' });
-    return;
-  }
-
-  const filter = savedFilters[index];
-  if (filter.ownerId !== user.id && user.role !== 'SUPER_ADMIN') {
-    res.status(403).json({ error: 'Forbidden: You can only delete your own saved filters.' });
-    return;
-  }
-
-  savedFilters.splice(index, 1);
-  persistData();
-
-  logAudit(
-    { id: user.id, email: user.email, role: user.role },
-    'SAVED_FILTER_DELETED',
-    'SAVED_FILTER',
-    id,
-    `${user.role} ${user.displayName} deleted saved filter "${filter.name}".`,
-    req
-  );
-
-  res.json({ success: true, message: 'Saved filter deleted successfully.' });
 });
 
 /**
@@ -11684,6 +11685,24 @@ app.post('/api/reports/generate', requireAdmin, (req: Request, res: Response) =>
   });
 });
 
+
+// ==========================================
+// 2.9 API 404 & ERROR SAFETY HANDLERS
+// ==========================================
+
+// Ensure all unhandled /api requests return strict JSON instead of falling through to Vite HTML
+app.all('/api/*', (req: Request, res: Response) => {
+  res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Global API error handler ensuring errors are serialized as JSON
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error('[API Error Handler]', err);
+  if (req.originalUrl && req.originalUrl.startsWith('/api/')) {
+    return res.status(500).json({ error: err?.message || 'Internal server error' });
+  }
+  next(err);
+});
 
 // ==========================================
 // 3. VITE MIDDLEWARE & STATIC SERVING
